@@ -12,6 +12,7 @@ export const DeploymentModel = z.object({
   gitCommitUrl: z.string(),
   deploymentStatus: DeploymentStatus,
   deploymentMessage: z.string().optional(),
+  environmentVariables: z.record(z.string()).optional(),
 });
 
 export type DeploymentModel = z.infer<typeof DeploymentModel>;

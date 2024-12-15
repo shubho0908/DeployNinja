@@ -31,9 +31,20 @@ function parseGitUrl(url: string, branch: string): GitRepoParams | null {
   const parts = url.split("/");
   if (parts.length < 5) return null;
 
+  const owner = parts[3];
+  const repo = parts[4].replace(".git", "");
+
+  const validatedData = GitRepoParamsSchema.safeParse({
+    owner,
+    repo,
+    branch,
+  });
+
+  if (!validatedData.success) return null;
+
   return {
-    owner: parts[3],
-    repo: parts[4].replace(".git", ""),
+    owner,
+    repo,
     branch,
   };
 }
@@ -46,8 +57,13 @@ export async function fetchGitLatestCommit({
     throw new Error("GitHub token not configured");
   }
 
-  if (!repoUrl) {
-    throw new Error("Repository URL is required");
+  const validatedData = FetchGitInfoParamsSchema.safeParse({
+    repoUrl,
+    branch,
+  });
+
+  if (!validatedData.success) {
+    throw new Error("Invalid repository URL format");
   }
 
   const repoParams = parseGitUrl(repoUrl, branch);
@@ -92,20 +108,20 @@ const GithubRepositoriesResponseSchema = z.array(GithubRepositorySchema);
 type GithubRepository = z.infer<typeof GithubRepositorySchema>;
 
 export async function fetchGitUserRepositories(
-  username: string
+  username: string,
+  accessToken: string
 ): Promise<GithubRepository[]> {
-  if (!GITHUB_TOKEN) {
-    throw new Error("GitHub token not configured");
+  if (!accessToken) {
+    throw new Error("Access token not provided");
   }
 
   try {
-    const octokit = new Octokit({ auth: GITHUB_TOKEN });
+    const octokit = new Octokit({ auth: accessToken });
     const repositories: GithubRepository[] = [];
     let page = 1;
 
     while (true) {
-      const { data } = await octokit.repos.listForUser({
-        username,
+      const { data } = await octokit.request("GET /user/repos", {
         type: "all",
         sort: "updated",
         direction: "desc",
@@ -113,8 +129,10 @@ export async function fetchGitUserRepositories(
         page,
       });
 
+      // Break loop if no more repositories
       if (data.length === 0) break;
 
+      // Validate repository data
       const validatedData = GithubRepositoriesResponseSchema.parse(
         data.map((repo) => ({
           id: repo.id,
@@ -130,6 +148,7 @@ export async function fetchGitUserRepositories(
 
       repositories.push(...validatedData);
 
+      // Exit if fewer than 100 items are returned, indicating the last page
       if (data.length < 100) break;
       page++;
     }

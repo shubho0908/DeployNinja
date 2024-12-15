@@ -24,6 +24,8 @@ export async function POST(req: NextRequest) {
       gitRepoUrl,
       buildCommand,
       installCommand,
+      projectRootDir,
+      environmentVariables,
     } = await req.json();
 
     // Validate the request data
@@ -32,6 +34,7 @@ export async function POST(req: NextRequest) {
       subDomain,
       gitBranchName,
       gitRepoUrl,
+      environmentVariables,
     });
 
     if (!parsedData.success) {
@@ -86,6 +89,16 @@ export async function POST(req: NextRequest) {
                 name: "PROJECT_BUILD_COMMAND",
                 value: buildCommand ?? "npm run build",
               },
+              {
+                name: "PROJECT_ROOT_DIR",
+                value: projectRootDir ?? "./",
+              },
+              ...Object.entries(environmentVariables ?? {}).map(
+                ([key, value]) => ({
+                  name: `PROJECT_ENVIRONMENT_${key}`,
+                  value,
+                })
+              ),
             ],
           },
         ],
@@ -113,6 +126,7 @@ export async function POST(req: NextRequest) {
           gitCommitHash: gitInfo.latestCommit,
           gitCommitUrl: `${gitRepoUrl}/commit/${gitInfo.latestCommit}`,
           deploymentStatus: DeploymentStatus.QUEUED,
+          environmentVariables: JSON.stringify(environmentVariables),
         },
       });
 
@@ -134,8 +148,10 @@ export async function POST(req: NextRequest) {
           gitCommitHash: gitInfo.latestCommit,
           gitCommitUrl: `${gitRepoUrl}/commit/${gitInfo.latestCommit}`,
           deploymentStatus: DeploymentStatus.FAILED,
+          
           deploymentMessage:
             error instanceof Error ? error.message : "Unknown error occurred",
+            environmentVariables: JSON.stringify(environmentVariables),
         },
       });
 
@@ -146,7 +162,7 @@ export async function POST(req: NextRequest) {
           error instanceof Error ? error.message : "Unknown error occurred",
       });
     }
-  } catch (error) {
+  } catch {
     return NextResponse.json({ status: 500, message: "Internal server error" });
   }
 }
@@ -208,7 +224,7 @@ export async function DELETE(req: NextRequest) {
       status: 200,
       message: `Deployment with id ${deploymentId} deleted successfully`,
     });
-  } catch (error) {
+  } catch {
     return NextResponse.json({ status: 500, message: "Internal server error" });
   }
 }

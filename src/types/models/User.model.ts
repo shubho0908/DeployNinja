@@ -7,6 +7,7 @@ export const UserModel = z.object({
   username: z.string(),
   profileImage: z.string(),
   isGithubConnected: z.boolean(),
+  githubAccessToken: z.string().optional(),
 });
 
 export type User = z.infer<typeof UserModel>;

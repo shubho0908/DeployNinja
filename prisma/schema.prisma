@@ -16,41 +16,42 @@ enum DeploymentStatus {
 }
 
 model User {
-  id        String   @id @default(uuid())
-  name      String
-  username  String
-  email     String   @unique
-  profileImage String?
-  isGithubConnected Boolean @default(false)
-  githubAccessToken String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  projects Project[]
+  id                String    @id @default(uuid())
+  name              String
+  username          String
+  email             String    @unique
+  profileImage      String?
+  isGithubConnected Boolean   @default(false)
+  githubAccessToken String
+  createdAt         DateTime  @default(now())
+  updatedAt         DateTime  @updatedAt
+  projects          Project[]
 }
 
 model Project {
-  id        String   @id @default(uuid())
-  name      String
-  ownerId   String
-  owner     User     @relation(fields: [ownerId], references: [id])
-  framework String
+  id          String       @id @default(uuid())
+  name        String
+  ownerId     String
+  owner       User         @relation(fields: [ownerId], references: [id])
+  framework   String
   deployments Deployment[]
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
 }
 
 model Deployment {
-  id        String   @id @default(uuid())
-  projectId String
-  project   Project  @relation(fields: [projectId], references: [id])
-  subDomain String
-  customDomain String?
-  gitBranchName String
-  gitRepoUrl String
-  gitCommitHash String
-  gitCommitUrl String
-  deploymentStatus DeploymentStatus @default(NOT_STARTED)
-  deploymentMessage String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  id                   String           @id @default(uuid())
+  projectId            String
+  project              Project          @relation(fields: [projectId], references: [id])
+  subDomain            String
+  customDomain         String?
+  gitBranchName        String
+  gitRepoUrl           String
+  gitCommitHash        String
+  gitCommitUrl         String
+  deploymentStatus     DeploymentStatus @default(NOT_STARTED)
+  deploymentMessage    String?
+  environmentVariables String?
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 }
