@@ -18,8 +18,8 @@ enum DeploymentStatus {
 model User {
   id                String    @id @default(uuid())
   name              String
-  username          String
-  email             String    @unique
+  username          String    @unique
+  email             String?   @unique
   profileImage      String?
   isGithubConnected Boolean   @default(false)
   githubAccessToken String
@@ -46,14 +46,14 @@ model Project {
 }
 
 model Deployment {
-  id        String  @id @default(uuid())
-  projectId String
-  project   Project @relation(fields: [projectId], references: [id])
+  id                   String           @id @default(uuid())
+  projectId            String
+  project              Project          @relation(fields: [projectId], references: [id])
   gitBranchName        String
   gitCommitHash        String
   deploymentStatus     DeploymentStatus @default(NOT_STARTED)
   deploymentMessage    String?
   environmentVariables String?
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
+  createdAt            DateTime         @default(now())
+  updatedAt            DateTime         @updatedAt
 }

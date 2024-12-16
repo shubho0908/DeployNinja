@@ -23,7 +23,7 @@ export async function GET(req: NextRequest) {
     }
 
     // Pass the access token to fetch repositories
-    const repositories = await fetchGitUserRepositories(username, accessToken);
+    const repositories = await fetchGitUserRepositories(accessToken);
     return NextResponse.json(repositories);
   } catch (error) {
     if (error instanceof Error) {

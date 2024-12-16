@@ -1,11 +1,33 @@
 "use client";
 import { Button } from "@/components/ui/button";
 import { Plus } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import NewProjectDialog from "@/components/NewProjectDialog";
+import { useSession } from "next-auth/react";
+import { useRouter } from "next/navigation";
 
 function Dashboard() {
   const [isNewProjectOpen, setIsNewProjectOpen] = useState(false);
+  const { data: session } = useSession();
+  const router = useRouter();
+
+  useEffect(() => {
+    const SaveUserData = async () => {
+      try {
+        const response = await fetch("/api/login");
+        const data = await response.json();
+        console.log(data);
+      } catch (error) {
+        console.log(error);
+      }
+    };
+
+    if (!session) {
+      router.push("/");
+    } else {
+      SaveUserData();
+    }
+  }, [session]);
 
   return (
     <div className="min-h-screen bg-background p-8">

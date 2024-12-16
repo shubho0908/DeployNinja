@@ -4,7 +4,8 @@ import { fetchGitLatestCommit } from "@/utils/github";
 import { ECSClient, RunTaskCommand } from "@aws-sdk/client-ecs";
 import { DeploymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import { Octokit } from "@octokit/rest"; // GitHub API client
+import { Octokit } from "@octokit/rest";
+import { exec } from "child_process";
 
 const ecsClient = new ECSClient({
   region: process.env.AWS_REGION!,
@@ -59,17 +60,63 @@ async function createGitHubWebhook(
   }
 }
 
+// Function to run Docker deployment
+async function runDockerDeploymentWithCLI(
+  projectId: string,
+  ecrImage: string,
+  environmentVariables: Record<string, string> = {}
+) {
+  try {
+    const envVars = Object.entries(environmentVariables)
+      .map(([key, value]) => `-e ${key}="${value}"`)
+      .join(" ");
+
+    const command = `docker run -d -i -t ${envVars} ${ecrImage}`;
+    console.log(`Running command: ${command}`);
+
+    await new Promise((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error("Docker CLI error:", stderr || error.message);
+          reject(new Error("Docker CLI deployment failed"));
+        } else {
+          console.log("Docker CLI output:", stdout);
+          resolve(stdout);
+        }
+      });
+    });
+
+    console.log("Docker container started successfully.");
+  } catch (error) {
+    console.error("Docker CLI deployment failed:", error);
+    throw error;
+  }
+}
+
 // POST route to start a deployment
 export async function POST(req: NextRequest) {
   try {
+    console.log("POST request received");
+
+    // Extract the access token from the Authorization header
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authorization token missing or invalid" },
+        { status: 401 }
+      );
+    }
+
+    const accessToken = authHeader.split(" ")[1];
+
     const {
       projectId,
       gitBranchName,
       gitRepoUrl,
       gitCommitHash,
-      buildCommand,
-      installCommand,
-      projectRootDir,
+      // buildCommand,
+      // installCommand,
+      // projectRootDir,
       environmentVariables,
     } = await req.json();
 
@@ -97,90 +144,101 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 404, message: "Project not found" });
     }
 
-    // Create webhook for the repository
-    const webhookUrl = `${process.env.BASE_URL}/api/git/webhook?projectId=${projectId}`;
-    const webhookSecret = process.env.WEBHOOK_SECRET!;
+    // try {
+    //   const webhookUrl = `${process.env.BASE_URL}/api/git/webhook?projectId=${projectId}`;
+    //   const webhookSecret = process.env.WEBHOOK_SECRET!;
 
-    try {
-      await createGitHubWebhook(gitRepoUrl, webhookSecret, webhookUrl);
-    } catch (error) {
-      return NextResponse.json({
-        status: 500,
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      });
-    }
+    //   await createGitHubWebhook(gitRepoUrl, webhookSecret, webhookUrl);
+    // } catch (error) {
+    //   return NextResponse.json({
+    //     status: 500,
+    //     message:
+    //       error instanceof Error ? error.message : "Unknown error occurred",
+    //   });
+    // }
 
     const gitInfo = await fetchGitLatestCommit({
+      accessToken,
       repoUrl: gitRepoUrl,
       branch: gitBranchName,
     });
 
+    console.log(gitInfo);
+
     // Deployment logic remains unchanged
-    const command = new RunTaskCommand({
-      cluster: process.env.CLUSTER!,
-      taskDefinition: process.env.TASK!,
-      launchType: "FARGATE",
-      count: 1,
-      networkConfiguration: {
-        awsvpcConfiguration: {
-          subnets: process.env.SUBNETS!.split(","),
-          securityGroups: process.env.SECURITY_GROUPS!.split(","),
-          assignPublicIp: "ENABLED",
-        },
-      },
-      overrides: {
-        containerOverrides: [
-          {
-            name: process.env.AWS_ECR_IMAGE,
-            environment: [
-              { name: "PROJECT_ID", value: projectId },
-              { name: "GITHUB_REPO_URL", value: gitRepoUrl },
-              {
-                name: "PROJECT_INSTALL_COMMAND",
-                value: installCommand ?? "npm install",
-              },
-              {
-                name: "PROJECT_BUILD_COMMAND",
-                value: buildCommand ?? "npm run build",
-              },
-              {
-                name: "PROJECT_ROOT_DIR",
-                value: projectRootDir ?? "./",
-              },
-              ...Object.entries(environmentVariables ?? {}).map(
-                ([key, value]) => ({
-                  name: `PROJECT_ENVIRONMENT_${key}`,
-                  value,
-                })
-              ),
-            ],
-          },
-        ],
-      },
-    });
+    // const command = new RunTaskCommand({
+    //   cluster: process.env.CLUSTER!,
+    //   taskDefinition: process.env.TASK!,
+    //   launchType: "FARGATE",
+    //   count: 1,
+    //   networkConfiguration: {
+    //     awsvpcConfiguration: {
+    //       subnets: process.env.SUBNETS!.split(","),
+    //       securityGroups: process.env.SECURITY_GROUPS!.split(","),
+    //       assignPublicIp: "ENABLED",
+    //     },
+    //   },
+    //   overrides: {
+    //     containerOverrides: [
+    //       {
+    //         name: process.env.AWS_ECR_IMAGE,
+    //         environment: [
+    //           { name: "PROJECT_ID", value: projectId },
+    //           { name: "GITHUB_REPO_URL", value: gitRepoUrl },
+    //           {
+    //             name: "PROJECT_INSTALL_COMMAND",
+    //             value: installCommand ?? "npm install",
+    //           },
+    //           {
+    //             name: "PROJECT_BUILD_COMMAND",
+    //             value: buildCommand ?? "npm run build",
+    //           },
+    //           {
+    //             name: "PROJECT_ROOT_DIR",
+    //             value: projectRootDir ?? "./",
+    //           },
+    //           ...Object.entries(environmentVariables ?? {}).map(
+    //             ([key, value]) => ({
+    //               name: `PROJECT_ENVIRONMENT_${key}`,
+    //               value,
+    //             })
+    //           ),
+    //         ],
+    //       },
+    //     ],
+    //   },
+    // });
+
+    // try {
+    // const response = await ecsClient.send(command);
+
+    // if (!response.tasks || response.tasks.length === 0) {
+    //   return NextResponse.json({
+    //     status: 500,
+    //     message: "Failed to start deployment task",
+    //   });
+    // }
 
     try {
-      const response = await ecsClient.send(command);
-
-      if (!response.tasks || response.tasks.length === 0) {
-        return NextResponse.json({
-          status: 500,
-          message: "Failed to start deployment task",
-        });
-      }
+      await runDockerDeploymentWithCLI(
+        projectId,
+        process.env.AWS_ECR_IMAGE_URI!,
+        environmentVariables
+      );
 
       // Create a deployment record
       const deployment = await prisma.deployment.create({
         data: {
           projectId,
           gitBranchName,
-          gitCommitHash: gitInfo.latestCommit,
+          gitCommitHash,
           deploymentStatus: DeploymentStatus.QUEUED,
           deploymentMessage: "Deployment has been started",
-          environmentVariables,
+          environmentVariables: JSON.stringify(environmentVariables),
         },
       });
+
+      console.log("Deployment created successfully:", deployment);
 
       return NextResponse.json({
         status: 200,
@@ -188,23 +246,6 @@ export async function POST(req: NextRequest) {
         data: deployment,
       });
     } catch (error) {
-      console.error("ECS Task deployment failed:", error);
-
-      // Create failed deployment record
-
-      await prisma.deployment.create({
-        data: {
-          projectId,
-          gitBranchName,
-          gitCommitHash,
-          deploymentStatus: DeploymentStatus.FAILED,
-          deploymentMessage:
-            error instanceof Error
-              ? error.message
-              : "Error while deploying your service, an unknown error occurred",
-        },
-      });
-
       return NextResponse.json({
         status: 500,
         message: "Failed to start deployment",
@@ -212,6 +253,30 @@ export async function POST(req: NextRequest) {
           error instanceof Error ? error.message : "Unknown error occurred",
       });
     }
+    // } catch (error) {
+    //   console.error("ECS Task deployment failed:", error);
+
+    //   // Create failed deployment record
+    //   await prisma.deployment.create({
+    //     data: {
+    //       projectId,
+    //       gitBranchName,
+    //       gitCommitHash,
+    //       deploymentStatus: DeploymentStatus.FAILED,
+    //       deploymentMessage:
+    //         error instanceof Error
+    //           ? error.message
+    //           : "Error while deploying your service, an unknown error occurred",
+    //     },
+    //   });
+
+    //   return NextResponse.json({
+    //     status: 500,
+    //     message: "Failed to start deployment",
+    //     error:
+    //       error instanceof Error ? error.message : "Unknown error occurred",
+    //   });
+    // }
   } catch {
     return NextResponse.json({ status: 500, message: "Internal server error" });
   }

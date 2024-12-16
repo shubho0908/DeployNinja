@@ -2,7 +2,7 @@ import { NextResponse } from "next/server";
 import { auth } from "@/auth";
 import { prisma } from "@/lib/prisma";
 
-export async function POST() {
+export async function GET() {
   try {
     const session = await auth();
 
@@ -10,14 +10,24 @@ export async function POST() {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
+    const isUserExists = await prisma.user.findFirst({
+      where: { username: session?.username! },
+    });
+
+    if (isUserExists) {
+      return NextResponse.json(
+        { error: "User already exists" },
+        { status: 400 }
+      );
+    }
+
     await prisma.user.create({
       data: {
         name: session?.user?.name!,
         username: session?.username!,
-        email: session?.user?.email!,
         profileImage: session?.user?.image!,
         isGithubConnected: true,
-        githubAccessToken: session.accessToken,
+        githubAccessToken: session.accessToken!,
       },
     });
 

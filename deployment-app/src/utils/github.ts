@@ -1,4 +1,5 @@
 import { Octokit } from "@octokit/rest";
+import { access } from "fs";
 import { z } from "zod";
 
 // Schema definitions
@@ -15,6 +16,7 @@ const GitRepoParamsSchema = z.object({
 });
 
 const FetchGitInfoParamsSchema = z.object({
+  accessToken: z.string(),
   repoUrl: z.string(),
   branch: z.string(),
 });
@@ -50,14 +52,16 @@ function parseGitUrl(url: string, branch: string): GitRepoParams | null {
 }
 
 export async function fetchGitLatestCommit({
+  accessToken,
   repoUrl,
   branch,
 }: FetchGitInfoParams): Promise<GitResponse> {
-  if (!GITHUB_TOKEN) {
+  if (!accessToken) {
     throw new Error("GitHub token not configured");
   }
 
   const validatedData = FetchGitInfoParamsSchema.safeParse({
+    accessToken,
     repoUrl,
     branch,
   });
@@ -72,7 +76,7 @@ export async function fetchGitLatestCommit({
   }
 
   try {
-    const octokit = new Octokit({ auth: GITHUB_TOKEN });
+    const octokit = new Octokit({ auth: accessToken });
     const { data } = await octokit.repos.getBranch({
       ...repoParams,
       branch,
@@ -108,7 +112,6 @@ const GithubRepositoriesResponseSchema = z.array(GithubRepositorySchema);
 type GithubRepository = z.infer<typeof GithubRepositorySchema>;
 
 export async function fetchGitUserRepositories(
-  username: string,
   accessToken: string
 ): Promise<GithubRepository[]> {
   if (!accessToken) {
