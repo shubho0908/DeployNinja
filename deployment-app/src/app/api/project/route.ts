@@ -29,9 +29,25 @@ export async function POST(req: NextRequest) {
       });
     }
 
-    const { name, ownerId, framework } = validatedData.data;
+    const {
+      name,
+      ownerId,
+      framework,
+      installCommand,
+      buildCommand,
+      projectRootDir,
+      gitRepoUrl,
+    } = validatedData.data;
     const project = await prisma.project.create({
-      data: { name, ownerId, framework: framework.name },
+      data: {
+        name,
+        ownerId,
+        framework: framework.name,
+        gitRepoUrl,
+        installCommand,
+        buildCommand,
+        projectRootDir,
+      },
     });
 
     return NextResponse.json({ status: 200, data: project });

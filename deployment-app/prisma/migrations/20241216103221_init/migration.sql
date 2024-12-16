@@ -9,6 +9,7 @@ CREATE TABLE "User" (
     "email" TEXT NOT NULL,
     "profileImage" TEXT,
     "isGithubConnected" BOOLEAN NOT NULL DEFAULT false,
+    "githubAccessToken" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -20,6 +21,7 @@ CREATE TABLE "Project" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
+    "framework" TEXT NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -37,6 +39,11 @@ CREATE TABLE "Deployment" (
     "gitCommitHash" TEXT NOT NULL,
     "gitCommitUrl" TEXT NOT NULL,
     "deploymentStatus" "DeploymentStatus" NOT NULL DEFAULT 'NOT_STARTED',
+    "deploymentMessage" TEXT,
+    "environmentVariables" TEXT,
+    "installCommand" TEXT,
+    "buildCommand" TEXT,
+    "projectRootDir" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
