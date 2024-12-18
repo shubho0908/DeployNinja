@@ -18,6 +18,7 @@ COPY main.sh main.sh
 COPY server.js server.js
 COPY .env .env
 COPY package*.json .
+COPY ca.pem ca.pem
 
 RUN npm install
 

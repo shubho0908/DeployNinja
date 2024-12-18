@@ -6,6 +6,7 @@ import { DeploymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { Octokit } from "@octokit/rest";
 import { exec } from "child_process";
+import { generateSlug } from "random-word-slugs";
 
 const ecsClient = new ECSClient({
   region: process.env.AWS_REGION!,
@@ -116,7 +117,7 @@ async function createGitHubWebhook(
 
 // Function to run Docker deployment
 async function runDockerDeploymentWithCLI(
-  projectId: string,
+  deploymentId: string,
   ecrImage: string,
   environmentVariables: Record<string, string> = {}
 ) {
@@ -125,7 +126,7 @@ async function runDockerDeploymentWithCLI(
       .map(([key, value]) => `-e ${key}="${value}"`)
       .join(" ");
 
-    const command = `docker run -d -i -t ${envVars} ${ecrImage}`;
+    const command = `docker run -d -i -t ${envVars} -e DEPLOYEMENT_ID=${deploymentId} ${ecrImage}`;
     console.log(`Running command: ${command}`);
 
     await new Promise((resolve, reject) => {
@@ -182,6 +183,7 @@ export async function POST(req: NextRequest) {
         ? JSON.parse(environmentVariables)
         : environmentVariables;
     const parsedData = DeploymentModel.safeParse({
+      id: "",
       projectId,
       gitBranchName,
       gitRepoUrl,
@@ -209,7 +211,7 @@ export async function POST(req: NextRequest) {
 
     if (requestMaker !== "webhook") {
       try {
-        const webhookUrl = `${process.env.BASE_URL}/api/git/webhook?projectId=${projectId}&token=${accessToken}`;
+        const webhookUrl = `${process.env.WEBHOOK_BASE_URL}/api/git/webhook?projectId=${projectId}&token=${accessToken}`;
         const webhookSecret = process.env.WEBHOOK_SECRET!;
 
         await createGitHubWebhook(
@@ -288,11 +290,15 @@ export async function POST(req: NextRequest) {
     // }
 
     try {
-      await runDockerDeploymentWithCLI(
-        projectId,
-        process.env.AWS_ECR_IMAGE_URI!,
-        envVarsObject
-      );
+      if (!project.subDomain) {
+        const subDomain = generateSlug();
+
+        //Update project with slug
+        await prisma.project.update({
+          where: { id: projectId },
+          data: { subDomain },
+        });
+      }
 
       // Create a deployment record
       const deployment = await prisma.deployment.create({
@@ -305,13 +311,18 @@ export async function POST(req: NextRequest) {
           environmentVariables: JSON.stringify(envVarsObject),
         },
       });
+      await runDockerDeploymentWithCLI(
+        deployment.id,
+        process.env.AWS_ECR_IMAGE_URI!,
+        envVarsObject
+      );
 
       console.log("Deployment created successfully:", deployment);
 
       return NextResponse.json({
         status: 200,
         message: "Deployment started",
-        data: deployment,
+        data: { deployment, subDomain: project.subDomain },
       });
     } catch (error) {
       return NextResponse.json({
