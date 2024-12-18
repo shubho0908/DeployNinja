@@ -1,5 +1,5 @@
 -- CreateEnum
-CREATE TYPE "DeploymentStatus" AS ENUM ('NOT_STARTED', 'QUEUED', 'IN_PROGRESS', 'READY', 'FAILED');
+CREATE TYPE "DeploymentStatus" AS ENUM ('NOT_STARTED', 'IN_PROGRESS', 'READY', 'FAILED');
 
 -- CreateTable
 CREATE TABLE "User" (

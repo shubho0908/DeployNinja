@@ -3,10 +3,20 @@ import { prisma } from "@/lib/prisma";
 import { ProjectModel } from "@/types/models/Project.model";
 
 // GET route to get all projects — Dashboard
-export async function GET() {
+export async function GET(req: NextRequest) {
   try {
-    const projects = await prisma.project.findMany();
-    return NextResponse.json({ status: 200, data: projects });
+    const userId = req.nextUrl.searchParams.get("userId");
+
+    if (!userId) {
+      return NextResponse.json({
+        status: 400,
+        message: "userId is required",
+      });
+    }
+    const projects = await prisma.project.findMany({
+      where: { ownerId: userId },
+    });
+    return NextResponse.json({ status: 200, project: projects });
   } catch (error) {
     return NextResponse.json({
       status: 500,
@@ -42,7 +52,7 @@ export async function POST(req: NextRequest) {
       data: {
         name,
         ownerId,
-        framework: framework.name,
+        framework,
         gitRepoUrl,
         installCommand,
         buildCommand,
@@ -50,7 +60,7 @@ export async function POST(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ status: 200, data: project });
+    return NextResponse.json({ status: 200, project: project });
   } catch (error) {
     return NextResponse.json({
       status: 500,

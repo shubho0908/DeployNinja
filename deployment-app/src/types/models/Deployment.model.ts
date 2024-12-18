@@ -2,6 +2,7 @@ import { z } from "zod";
 import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
 
 export const DeploymentModel = z.object({
+  id: z.string(),
   projectId: z.string(),
   subDomain: z.string().optional(),
   customDomain: z.string().optional(),

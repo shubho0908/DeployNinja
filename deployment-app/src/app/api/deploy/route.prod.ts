@@ -59,6 +59,33 @@ async function createGitHubWebhook(
   }
 }
 
+// GET route to get all deployments
+
+export async function GET(req: NextRequest) {
+  try {
+    const searchParams = req.nextUrl.searchParams;
+    const projectId = searchParams.get("projectId");
+
+    if (!projectId) {
+      return NextResponse.json({
+        status: 400,
+        message: "projectId is required",
+      });
+    }
+
+    const deployments = await prisma.deployment.findMany({
+      where: { projectId },
+    });
+
+    return NextResponse.json({ status: 200, data: deployments });
+  } catch (error) {
+    return NextResponse.json({
+      status: 500,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
 // POST route to start a deployment
 export async function POST(req: NextRequest) {
   try {
@@ -189,7 +216,7 @@ export async function POST(req: NextRequest) {
           projectId,
           gitBranchName,
           gitCommitHash,
-          deploymentStatus: DeploymentStatus.QUEUED,
+          deploymentStatus: DeploymentStatus.IN_PROGRESS,
           deploymentMessage: "Deployment has been started",
         },
       });

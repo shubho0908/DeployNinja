@@ -1,17 +1,9 @@
-import { auth } from "@/auth";
-import Link from "next/link";
-import Login from "./web-components/Login";
+import HomePage from "../components/Home";
 
 export default async function Home() {
-  const session = await auth();
-
-  if (session) {
-    return <Link href="/dashboard">Dashboard</Link>;
-  }
-
   return (
     <>
-      <Login />
+      <HomePage />
     </>
   );
 }

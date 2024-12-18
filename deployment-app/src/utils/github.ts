@@ -167,3 +167,102 @@ export async function fetchGitUserRepositories(
     throw new Error("Failed to fetch repository data");
   }
 }
+
+// Create GitHub webhook for specified repository
+async function createGitHubWebhook(
+  repoUrl: string,
+  secret: string,
+  webhookUrl: string,
+  accessToken: string
+) {
+  // GitHub API client
+  const octokit = new Octokit({
+    auth: accessToken,
+  });
+
+  const [owner, repo] = repoUrl.replace("https://github.com/", "").split("/");
+
+  try {
+    console.log("Checking if webhook already exists...");
+
+    // Check if webhook already exists
+    const { data: webhooks } = await octokit.request(
+      "GET /repos/{owner}/{repo}/hooks",
+      {
+        owner,
+        repo,
+        headers: {
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }
+    );
+
+    if (webhooks.some((hook) => hook.config.url === webhookUrl)) {
+      console.log("Webhook already exists for this repository.");
+      return;
+    }
+
+    // Create webhook using direct request method
+    await octokit.request("POST /repos/{owner}/{repo}/hooks", {
+      owner,
+      repo,
+      config: {
+        url: webhookUrl,
+        secret,
+        content_type: "json",
+      },
+      events: ["push"],
+      active: true,
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
+    });
+
+    console.log("Webhook created successfully.");
+  } catch (error: unknown) {
+    // Type guard to check if error is an object with status property
+    if (
+      error instanceof Error &&
+      "status" in error &&
+      (error as { status: number }).status === 404
+    ) {
+      try {
+        // Attempt to create the webhook directly if the repository is not found
+        await octokit.request("POST /repos/{owner}/{repo}/hooks", {
+          owner,
+          repo,
+          config: {
+            url: webhookUrl,
+            secret,
+            content_type: "json",
+          },
+          events: ["push"],
+          active: true,
+          headers: {
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        });
+        console.log("Webhook created successfully after 404 error.");
+      } catch (createError: unknown) {
+        // Handle potential error in webhook creation
+        if (createError instanceof Error) {
+          console.error(
+            "Failed to create GitHub webhook after 404:",
+            createError.message
+          );
+          throw new Error(
+            `Failed to create GitHub webhook: ${createError.message}`
+          );
+        }
+
+        // Fallback for any unexpected errors
+        console.error("Unexpected error creating webhook:", createError);
+        throw createError;
+      }
+    } else {
+      // Handle other types of errors
+      console.error("Failed to create GitHub webhook:", error);
+      throw error;
+    }
+  }
+}

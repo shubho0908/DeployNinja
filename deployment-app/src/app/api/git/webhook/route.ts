@@ -12,7 +12,7 @@ function verifyGitHubWebhook(req: NextRequest, payload: string): boolean {
     return false;
   }
 
-  const secret = process.env.GITHUB_WEBHOOK_SECRET;
+  const secret = process.env.WEBHOOK_SECRET;
   if (!secret) {
     console.error("GitHub webhook secret is not set");
     return false;
@@ -31,6 +31,12 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await req.text();
     const projectId = req.nextUrl.searchParams.get("projectId");
+    const accessToken = req.nextUrl.searchParams.get("token");
+    const eventType = req.headers.get("X-GitHub-Event");
+
+    if (!accessToken) {
+      return NextResponse.json({ status: 401, message: "Unauthorized" });
+    }
 
     // Verify webhook signature
     if (!verifyGitHubWebhook(req, payload)) {
@@ -38,7 +44,9 @@ export async function POST(req: NextRequest) {
     }
     const body = JSON.parse(payload);
 
-    if (body.event !== "push") {
+    console.log("Webhook event", eventType);
+
+    if (eventType !== "push") {
       return NextResponse.json({ status: 200, message: "Not a push event" });
     }
 
@@ -48,31 +56,31 @@ export async function POST(req: NextRequest) {
     const commitHash = body.after;
 
     // Get the project ID from request params
+    console.log("Searching for project with ID:", projectId);
 
     // Find the specific project matching the repo URL and project ID
     const project = await prisma.project.findUnique({
       where: {
         id: projectId!,
-        gitRepoUrl: repoUrl,
       },
       include: {
-        deployments: {
-          include: {
-            project: true,
-          },
-        },
+        deployments: true,
       },
     });
 
     if (!project) {
+      console.log("No project found for the push event");
       return NextResponse.json({
         status: 200,
         message: "No matching project found for the push event",
       });
     }
 
+    console.log("Preparing deployment payload...");
+
     // Fetch the latest commit to ensure we're using the most recent information
     await fetchGitLatestCommit({
+      accessToken,
       repoUrl,
       branch: branchName,
     });
@@ -86,16 +94,19 @@ export async function POST(req: NextRequest) {
       buildCommand: project?.buildCommand || "npm run build",
       installCommand: project?.installCommand || "npm install",
       projectRootDir: project?.projectRootDir || "./",
-      environmentVariables:
-        project.deployments[0]?.environmentVariables || {},
+      environmentVariables: project.deployments[0]?.environmentVariables || {},
     };
 
     // Send deployment request to your existing deployment endpoint
     // TODO: Update with axios
-    const deployResponse = await fetch("/api/deploy", {
+    console.log("Sending deployment request...");
+
+    const deployResponse = await fetch("http://localhost:3000/api/deploy", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
+        Authorization: `Bearer ${accessToken}`,
+        "X-Request-Maker": "webhook",
       },
       body: JSON.stringify(deploymentPayload),
     });
@@ -105,7 +116,7 @@ export async function POST(req: NextRequest) {
     // Log deployment result
     console.log(
       `Deployment triggered for project ${project.id}:`,
-      deployResult
+      JSON.stringify(deployResult)
     );
 
     return NextResponse.json({
@@ -114,7 +125,7 @@ export async function POST(req: NextRequest) {
       projectsDeployed: 1,
     });
   } catch (error) {
-    console.error("Webhook processing error:", error);
+    console.log("Webhook processing error:", error);
     return NextResponse.json({
       status: 500,
       message: "Internal server error",

@@ -16,12 +16,12 @@ export async function GET() {
 
     if (isUserExists) {
       return NextResponse.json(
-        { error: "User already exists" },
-        { status: 400 }
+        { message: "User already exists", user: isUserExists },
+        { status: 200 }
       );
     }
 
-    await prisma.user.create({
+    const user = await prisma.user.create({
       data: {
         name: session?.user?.name!,
         username: session?.username!,
@@ -31,7 +31,7 @@ export async function GET() {
       },
     });
 
-    return NextResponse.json({ message: "Logged in successfully" });
+    return NextResponse.json({ message: "Logged in successfully", user });
   } catch (error) {
     if (error instanceof Error) {
       return NextResponse.json({ error: error.message }, { status: 500 });

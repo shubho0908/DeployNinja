@@ -15,33 +15,42 @@ const ecsClient = new ECSClient({
   },
 });
 
-// GitHub API client
-const octokit = new Octokit({
-  auth: process.env.GITHUB_ACCESS_TOKEN,
-});
-
 // Function to create a Github webhook for a given repository
 async function createGitHubWebhook(
   repoUrl: string,
   secret: string,
-  webhookUrl: string
+  webhookUrl: string,
+  accessToken: string
 ) {
+  // GitHub API client
+  const octokit = new Octokit({
+    auth: accessToken,
+  });
+
   const [owner, repo] = repoUrl.replace("https://github.com/", "").split("/");
 
   try {
+    console.log("Checking if webhook already exists...");
+
     // Check if webhook already exists
-    const { data: webhooks } = await octokit.repos.listWebhooks({
-      owner,
-      repo,
-    });
+    const { data: webhooks } = await octokit.request(
+      "GET /repos/{owner}/{repo}/hooks",
+      {
+        owner,
+        repo,
+        headers: {
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }
+    );
 
     if (webhooks.some((hook) => hook.config.url === webhookUrl)) {
       console.log("Webhook already exists for this repository.");
       return;
     }
 
-    // Create webhook which only triggers on push events
-    await octokit.repos.createWebhook({
+    // Create webhook using direct request method
+    await octokit.request("POST /repos/{owner}/{repo}/hooks", {
       owner,
       repo,
       config: {
@@ -51,12 +60,57 @@ async function createGitHubWebhook(
       },
       events: ["push"],
       active: true,
+      headers: {
+        "X-GitHub-Api-Version": "2022-11-28",
+      },
     });
 
     console.log("Webhook created successfully.");
-  } catch (error) {
-    console.error("Failed to create GitHub webhook:", error);
-    throw new Error("Failed to create GitHub webhook");
+  } catch (error: unknown) {
+    // Type guard to check if error is an object with status property
+    if (
+      error instanceof Error &&
+      "status" in error &&
+      (error as { status: number }).status === 404
+    ) {
+      try {
+        // Attempt to create the webhook directly if the repository is not found
+        await octokit.request("POST /repos/{owner}/{repo}/hooks", {
+          owner,
+          repo,
+          config: {
+            url: webhookUrl,
+            secret,
+            content_type: "json",
+          },
+          events: ["push"],
+          active: true,
+          headers: {
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        });
+        console.log("Webhook created successfully after 404 error.");
+      } catch (createError: unknown) {
+        // Handle potential error in webhook creation
+        if (createError instanceof Error) {
+          console.error(
+            "Failed to create GitHub webhook after 404:",
+            createError.message
+          );
+          throw new Error(
+            `Failed to create GitHub webhook: ${createError.message}`
+          );
+        }
+
+        // Fallback for any unexpected errors
+        console.error("Unexpected error creating webhook:", createError);
+        throw createError;
+      }
+    } else {
+      // Handle other types of errors
+      console.error("Failed to create GitHub webhook:", error);
+      throw error;
+    }
   }
 }
 
@@ -100,6 +154,7 @@ export async function POST(req: NextRequest) {
 
     // Extract the access token from the Authorization header
     const authHeader = req.headers.get("Authorization");
+    const requestMaker = req.headers.get("X-Request-Maker");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return NextResponse.json(
         { error: "Authorization token missing or invalid" },
@@ -120,15 +175,23 @@ export async function POST(req: NextRequest) {
       environmentVariables,
     } = await req.json();
 
+    console.log("Yaha tk sb theek");
+
+    const envVarsObject =
+      typeof environmentVariables === "string"
+        ? JSON.parse(environmentVariables)
+        : environmentVariables;
     const parsedData = DeploymentModel.safeParse({
       projectId,
       gitBranchName,
       gitRepoUrl,
       gitCommitHash,
-      environmentVariables,
+      environmentVariables: envVarsObject,
     });
 
     if (!parsedData.success) {
+      console.log("Error ", parsedData.error);
+
       return NextResponse.json({
         status: 400,
         message: "Invalid request",
@@ -144,26 +207,31 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 404, message: "Project not found" });
     }
 
-    // try {
-    //   const webhookUrl = `${process.env.BASE_URL}/api/git/webhook?projectId=${projectId}`;
-    //   const webhookSecret = process.env.WEBHOOK_SECRET!;
+    if (requestMaker !== "webhook") {
+      try {
+        const webhookUrl = `${process.env.BASE_URL}/api/git/webhook?projectId=${projectId}&token=${accessToken}`;
+        const webhookSecret = process.env.WEBHOOK_SECRET!;
 
-    //   await createGitHubWebhook(gitRepoUrl, webhookSecret, webhookUrl);
-    // } catch (error) {
-    //   return NextResponse.json({
-    //     status: 500,
-    //     message:
-    //       error instanceof Error ? error.message : "Unknown error occurred",
-    //   });
-    // }
+        await createGitHubWebhook(
+          gitRepoUrl,
+          webhookSecret,
+          webhookUrl,
+          accessToken
+        );
+      } catch (error) {
+        return NextResponse.json({
+          status: 500,
+          message:
+            error instanceof Error ? error.message : "Unknown error occurred",
+        });
+      }
+    }
 
     const gitInfo = await fetchGitLatestCommit({
       accessToken,
       repoUrl: gitRepoUrl,
       branch: gitBranchName,
     });
-
-    console.log(gitInfo);
 
     // Deployment logic remains unchanged
     // const command = new RunTaskCommand({
@@ -223,7 +291,7 @@ export async function POST(req: NextRequest) {
       await runDockerDeploymentWithCLI(
         projectId,
         process.env.AWS_ECR_IMAGE_URI!,
-        environmentVariables
+        envVarsObject
       );
 
       // Create a deployment record
@@ -232,9 +300,9 @@ export async function POST(req: NextRequest) {
           projectId,
           gitBranchName,
           gitCommitHash,
-          deploymentStatus: DeploymentStatus.QUEUED,
+          deploymentStatus: DeploymentStatus.IN_PROGRESS,
           deploymentMessage: "Deployment has been started",
-          environmentVariables: JSON.stringify(environmentVariables),
+          environmentVariables: JSON.stringify(envVarsObject),
         },
       });
 
