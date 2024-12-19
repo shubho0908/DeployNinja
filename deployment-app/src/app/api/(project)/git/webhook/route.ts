@@ -55,9 +55,6 @@ export async function POST(req: NextRequest) {
     const branchName = body.ref.replace("refs/heads/", "");
     const commitHash = body.after;
 
-    // Get the project ID from request params
-    console.log("Searching for project with ID:", projectId);
-
     // Find the specific project matching the repo URL and project ID
     const project = await prisma.project.findUnique({
       where: {

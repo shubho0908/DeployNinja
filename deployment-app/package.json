@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@aws-sdk/client-ecs": "^3.712.0",
+    "@aws-sdk/client-s3": "^3.715.0",
     "@clickhouse/client": "^1.10.0",
     "@octokit/rest": "^21.0.2",
     "@prisma/client": "^6.1.0",

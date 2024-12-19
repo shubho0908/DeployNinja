@@ -29,7 +29,7 @@ const PROJECT_BUILD_COMMAND = process.env.PROJECT_BUILD_COMMAND;
 const PROJECT_ROOT_DIR = process.env.PROJECT_ROOT_DIR;
 const S3_BUCKET_NAME = envConfig.S3_BUCKET_NAME;
 
-// Kafka Client
+// Initialize clients
 const kafka = new Kafka({
   clientId: envConfig.KAFKA_CLIENT_ID,
   brokers: [envConfig.KAFKA_BROKER],
@@ -43,7 +43,6 @@ const kafka = new Kafka({
   },
 });
 
-// Clickhouse Client
 const client = createClient({
   database: envConfig.CLICKHOUSE_DB,
   url: envConfig.CLICKHOUSE_HOST,
@@ -55,35 +54,37 @@ const producer = kafka.producer({
 
 const consumer = kafka.consumer({ groupId: "build-logs-consumer" });
 
-// Flag to track upload completion
-let uploadComplete = false;
+let isExiting = false;
 
 async function publishLog(log) {
+  if (isExiting) return;
+  
   try {
     await producer.connect();
     await producer.send({
       topic: `build-logs`,
-      messages: [
-        {
-          key: "log",
-          value: JSON.stringify({ PROJECT_URI, DEPLOYEMENT_ID, log }),
-        },
-      ],
+      messages: [{ key: "log", value: JSON.stringify({ PROJECT_URI, DEPLOYEMENT_ID, log }) }],
     });
   } catch (error) {
     console.error("Error publishing log:", error);
   }
 }
 
-async function cleanupAndExit() {
+// Force exit is used to cleanup resources and exit the process, it's necessary to avoid memory leaks
+async function forceExit() {
+  if (isExiting) return;
+  isExiting = true;
+
+  console.log("Force exiting process...");
   try {
-    console.log("Cleaning up resources before exit...");
     await producer.disconnect();
     await consumer.disconnect();
     await client.close();
-    process.exit(0);
+    
+    // Force exit after a short delay to allow cleanup
+    setTimeout(() => process.exit(0), 1000);
   } catch (error) {
-    console.error("Error during cleanup:", error);
+    console.error("Error during force exit:", error);
     process.exit(1);
   }
 }
@@ -94,7 +95,6 @@ async function InitializeScript() {
     await publishLog("Executing script...");
     const outputDir = path.join(__dirname, "output");
 
-    // Filter out PROJECT_ENVIRONMENT_ variables from process.env
     const projectEnvVars = Object.keys(process.env)
       .filter((key) => key.startsWith("PROJECT_ENVIRONMENT_"))
       .reduce((envVars, key) => {
@@ -107,10 +107,7 @@ async function InitializeScript() {
         `cd ${outputDir} && ${PROJECT_INSTALL_COMMAND} && ${PROJECT_BUILD_COMMAND}`,
         {
           cwd: PROJECT_ROOT_DIR,
-          env: {
-            ...process.env,
-            ...projectEnvVars,
-          },
+          env: { ...process.env, ...projectEnvVars },
         }
       );
 
@@ -151,25 +148,27 @@ async function InitializeScript() {
 
           console.log("Upload complete...");
           await publishLog("Upload complete...");
-          uploadComplete = true;
-          resolve();
-          // Let the Kafka consumer handle the exit after processing the "Upload complete" message
+          
+          // After upload complete, wait a short time for the last log to be processed
+          setTimeout(async () => {
+            await forceExit();
+          }, 2000);
         } catch (error) {
-          console.error("Error in build process close handler:", error);
-          reject(error);
-          await cleanupAndExit();
+          console.error("Error in build process:", error);
+          await publishLog(`Error: ${error.message}`);
+          await forceExit();
         }
       });
 
       buildProcess.on("error", async (error) => {
         console.error("Execution error:", error);
-        reject(error);
-        await cleanupAndExit();
+        await publishLog(`Error: ${error.message}`);
+        await forceExit();
       });
     });
   } catch (error) {
     console.error("Error in InitializeScript:", error);
-    await cleanupAndExit();
+    await forceExit();
   }
 }
 
@@ -177,7 +176,9 @@ const initializeKafkaConsumer = async () => {
   try {
     const event_id = randomUUID();
     await consumer.connect();
-    await consumer.subscribe({ topic: "build-logs" });
+    
+    // Set to read only new messages by setting fromBeginning to false
+    await consumer.subscribe({ topic: "build-logs", fromBeginning: false });
 
     await consumer.run({
       eachBatch: async function ({
@@ -192,44 +193,46 @@ const initializeKafkaConsumer = async () => {
           if (!message.value) continue;
 
           const stringMessage = message.value.toString();
-          const { DEPLOYEMENT_ID, log } = JSON.parse(stringMessage);
-          console.log({ log, DEPLOYEMENT_ID });
+          const parsedMessage = JSON.parse(stringMessage);
+          
+          // Only process logs for current deployment
+          if (parsedMessage.DEPLOYEMENT_ID !== DEPLOYEMENT_ID) {
+            continue;
+          }
+
+          console.log({ log: parsedMessage.log, DEPLOYEMENT_ID: parsedMessage.DEPLOYEMENT_ID });
 
           try {
-            const { query_id } = await client.insert({
-              table: "log_events",
-              values: [
-                {
-                  event_id,
-                  deployment_id: DEPLOYEMENT_ID,
-                  log,
-                },
-              ],
-              format: "JSONEachRow",
-            });
+            if (!isExiting) {
+              const { query_id } = await client.insert({
+                table: "log_events",
+                values: [
+                  {
+                    event_id,
+                    deployment_id: parsedMessage.DEPLOYEMENT_ID,
+                    log: parsedMessage.log,
+                  },
+                ],
+                format: "JSONEachRow",
+              });
 
-            console.log(query_id);
+              console.log(query_id);
 
-            await commitOffsetsIfNecessary({
-              topics: [
-                {
-                  topic: "build-logs",
-                  partitions: [
-                    {
-                      partition: batch.partition,
-                      offset: message.offset,
-                    },
-                  ],
-                },
-              ],
-            });
+              await commitOffsetsIfNecessary({
+                topics: [
+                  {
+                    topic: "build-logs",
+                    partitions: [
+                      {
+                        partition: batch.partition,
+                        offset: message.offset,
+                      },
+                    ],
+                  },
+                ],
+              });
 
-            await heartbeat();
-
-            // Check for upload completion after processing each message
-            if (uploadComplete && log.includes("Upload complete")) {
-              console.log("Upload complete confirmed in Kafka consumer. Cleaning up...");
-              await cleanupAndExit();
+              await heartbeat();
             }
           } catch (err) {
             console.log(err);
@@ -239,17 +242,28 @@ const initializeKafkaConsumer = async () => {
       autoCommit: false,
       eachBatchAutoResolve: true,
     });
-
-    // Add a timeout to exit if process hangs
-    setTimeout(async () => {
-      console.log("Timeout reached. Cleaning up and exiting...");
-      await cleanupAndExit();
-    }, 30 * 60 * 1000); // 30 minutes timeout
   } catch (error) {
     console.error("Failed to initialize Kafka consumer:", error);
-    await cleanupAndExit();
+    await forceExit();
   }
 };
+
+// Set a global timeout
+setTimeout(async () => {
+  console.log("Global timeout reached (30 minutes). Force exiting...");
+  await forceExit();
+}, 30 * 60 * 1000);
+
+// Handle process signals
+process.on('SIGTERM', async () => {
+  console.log('Received SIGTERM. Cleaning up...');
+  await forceExit();
+});
+
+process.on('SIGINT', async () => {
+  console.log('Received SIGINT. Cleaning up...');
+  await forceExit();
+});
 
 InitializeScript();
 initializeKafkaConsumer();

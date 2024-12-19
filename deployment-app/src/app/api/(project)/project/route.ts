@@ -2,6 +2,29 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ProjectModel } from "@/types/models/Project.model";
 import { generateSlug } from "random-word-slugs";
+import {
+  S3Client,
+  DeleteObjectsCommand,
+  ListObjectsV2Command,
+} from "@aws-sdk/client-s3";
+
+// Check if required environment variables are defined
+if (
+  !process.env.AWS_REGION ||
+  !process.env.AWS_ACCESS_KEY_ID ||
+  !process.env.AWS_SECRET_ACCESS_KEY ||
+  !process.env.AWS_S3_BUCKET_NAME
+) {
+  throw new Error("Missing required AWS credentials in environment variables");
+}
+
+const s3Client = new S3Client({
+  region: process.env.AWS_REGION,
+  credentials: {
+    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
+    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
+  },
+});
 
 // GET route to get all projects — Dashboard
 export async function GET(req: NextRequest) {
@@ -14,6 +37,7 @@ export async function GET(req: NextRequest) {
         message: "userId is required",
       });
     }
+
     const projects = await prisma.project.findMany({
       where: { ownerId: userId },
     });
@@ -75,24 +99,50 @@ export async function POST(req: NextRequest) {
 // DELETE route to delete a project
 export async function DELETE(req: NextRequest) {
   try {
-    const searchParams = req.nextUrl.searchParams;
-    const projectId = searchParams.get("projectId");
+    const projectId = req.nextUrl.searchParams.get("projectId");
 
     if (!projectId) {
-      return NextResponse.json({
-        status: 400,
-        message: "projectId is required",
-      });
+      return NextResponse.json({ status: 400, message: "projectId is required" });
     }
 
-    await prisma.project.delete({
-      where: { id: projectId },
-    });
+    const project = await prisma.project.findUnique({ where: { id: projectId } });
 
-    return NextResponse.json({
-      status: 200,
-      message: `Project with id ${projectId} deleted successfully`,
-    });
+    if (!project) {
+      return NextResponse.json({ status: 404, message: `Project not found` });
+    }
+
+    const folderPrefix = `__outputs/${project.subDomain}/`;
+
+    // Delete deployments and project
+    await prisma.deployment.deleteMany({ where: { projectId } });
+    await prisma.project.delete({ where: { id: projectId } });
+
+    // Function to delete all objects under the S3 prefix
+    async function deleteFolder(bucketName: string, prefix: string) {
+      let isTruncated = true;
+      let continuationToken: string | undefined;
+
+      while (isTruncated) {
+        const listParams: any = { Bucket: bucketName, Prefix: prefix, ContinuationToken: continuationToken };
+        const listedObjects = await s3Client.send(new ListObjectsV2Command(listParams));
+
+        if (listedObjects.Contents?.length) {
+          const deleteParams = {
+            Bucket: bucketName,
+            Delete: { Objects: listedObjects.Contents.map((item) => ({ Key: item.Key })) },
+          };
+          await s3Client.send(new DeleteObjectsCommand(deleteParams));
+        }
+
+        isTruncated = listedObjects.IsTruncated || false;
+        continuationToken = listedObjects.NextContinuationToken;
+      }
+    }
+
+    // Delete folder from S3
+    await deleteFolder(process.env.AWS_S3_BUCKET_NAME!, folderPrefix);
+
+    return NextResponse.json({ status: 200, message: `Project and S3 folder deleted successfully` });
   } catch (error) {
     return NextResponse.json({
       status: 500,
