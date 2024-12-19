@@ -5,9 +5,9 @@ import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { ComponentType } from "react";
 import { useSelector } from "react-redux";
-import { getUser } from "@/redux/api/userApi";
 import { useAppDispatch } from "@/redux/hooks";
 import { RootState } from "@/app/store";
+import { getUser } from "@/redux/api/userApi";
 import { getProjects } from "@/redux/api/projectApi";
 
 export default function withAuthRequired<P extends object>(
@@ -19,57 +19,43 @@ export default function withAuthRequired<P extends object>(
     const dispatch = useAppDispatch();
     const { user } = useSelector((state: RootState) => state.user);
 
-    // Authentication check effect
     useEffect(() => {
+      // Handle authentication routing
       if (status === "unauthenticated") {
-        router.replace("/login");
+        const isAuthPage =
+          window.location.pathname === "/" ||
+          window.location.pathname.includes("/login");
+        router.replace(isAuthPage ? "/dashboard" : "/login");
+        return;
       }
-      else{
-        router.replace("/dashboard");
-      }
-    }, [status, router]);
 
-    // User data fetching effect
-    useEffect(() => {
-      const fetchUser = async () => {
-        try {
-          await dispatch(getUser());
-        } catch (error) {
-          console.error(error);
-          alert("Failed to fetch user data. Please try again later.");
+      // Handle data fetching
+      const initializeUserData = async () => {
+        if (!user && session) {
+          try {
+            await dispatch(getUser());
+          } catch (error) {
+            console.error("Failed to fetch user data:", error);
+          }
         }
       };
 
-      const fetchProjects = async () => {
-        try {
-          await dispatch(getProjects(user?.id!));
-        } catch (error) {
-          console.error(error);
-          alert("Failed to fetch projects. Please try again later.");
+      const initializeProjects = async () => {
+        if (user?.id) {
+          try {
+            await dispatch(getProjects(user.id));
+          } catch (error) {
+            console.error("Failed to fetch projects:", error);
+          }
         }
       };
 
-      if (!user && session) {
-        fetchUser();
-      }
+      initializeUserData();
+      if (user) initializeProjects();
+    }, [status, router, dispatch, user, session]);
 
-      if (user) {
-        fetchProjects();
-      }
-    }, [dispatch, user, session]);
-
-    // Show nothing while loading
-    if (status === "loading") {
-      return null;
-    }
-
-    // Show nothing while redirecting or if no session
-    if (!session) {
-      return null;
-    }
-
-    // Show nothing while fetching user data
-    if (!user) {
+    // Don't render anything while loading or unauthorized
+    if (status === "loading" || !session || !user) {
       return null;
     }
 

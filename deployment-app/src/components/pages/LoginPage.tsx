@@ -6,7 +6,7 @@ import { Github, Rocket, Lock, ArrowRight } from "lucide-react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { signIn, useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 
 const container = {
   hidden: { opacity: 0 },
@@ -27,11 +27,18 @@ export default function LoginPage() {
   const router = useRouter();
   const { data: session, status } = useSession();
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    if (session) {
-      router.push("/dashboard");
+    if (status === "loading") {
+      setLoading(true);
+    } else {
+      setLoading(false);
+      if (session) {
+        router.replace("/dashboard");
+      }
     }
-  }, [session, router]);
+  }, [session, status, router]);
 
   const handleGitHubLogin = () => {
     signIn("github");
@@ -43,8 +50,9 @@ export default function LoginPage() {
     { icon: <Rocket className="h-4 w-4" />, text: "Start Deploying Instantly" },
   ];
 
-  if (status === "loading") {
-    return <>Loading...</>;
+
+  if (loading || session) {
+    return null;
   }
 
   return (

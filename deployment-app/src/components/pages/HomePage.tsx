@@ -15,7 +15,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { useSession } from "next-auth/react";
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 
 const container = {
@@ -37,11 +37,18 @@ export default function Home() {
   const { data: session, status } = useSession();
   const router = useRouter();
 
+  const [loading, setLoading] = useState(true);
+
   useEffect(() => {
-    if (session) {
-      router.replace("/dashboard");
+    if (status === "loading") {
+      setLoading(true);
+    } else {
+      setLoading(false);
+      if (session) {
+        router.replace("/dashboard");
+      }
     }
-  }, [session, router]);
+  }, [session, status, router]);
 
   const features = [
     {
@@ -86,8 +93,8 @@ export default function Home() {
     { value: "50ms", label: "Global Latency" },
   ];
 
-  if (status === "loading") {
-    return <>Loading...</>;
+  if (loading || session) {
+    return null;
   }
 
   return (

@@ -36,7 +36,7 @@ const frameworks = [
   { id: 'angular', name: 'Angular', icon: '🅰️' }
 ]
 
-export default function ProjectCardPage() {
+export default function ProjectPage() {
   const [envVars, setEnvVars] = useState([{ key: '', value: '' }])
   const [selectedFramework, setSelectedFramework] = useState('nextjs')
 

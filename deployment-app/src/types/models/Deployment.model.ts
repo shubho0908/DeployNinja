@@ -9,6 +9,8 @@ export const DeploymentModel = z.object({
   deploymentStatus: DeploymentStatus.optional(),
   deploymentMessage: z.string().optional(),
   environmentVariables: z.record(z.string()).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
 });
 
 export type DeploymentModel = z.infer<typeof DeploymentModel>;

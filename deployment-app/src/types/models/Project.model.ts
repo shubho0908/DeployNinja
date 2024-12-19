@@ -12,6 +12,8 @@ export const ProjectModel = z.object({
   projectRootDir: z.string(),
   gitRepoUrl: z.string(),
   deployments: z.array(DeploymentModel).optional(),
+  createdAt: z.date().optional(),
+  updatedAt: z.date().optional(),
 });
 
 export type Project = z.infer<typeof ProjectModel>;
