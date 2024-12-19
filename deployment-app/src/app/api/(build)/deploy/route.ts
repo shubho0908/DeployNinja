@@ -6,7 +6,6 @@ import { DeploymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { Octokit } from "@octokit/rest";
 import { exec } from "child_process";
-import { generateSlug } from "random-word-slugs";
 
 const ecsClient = new ECSClient({
   region: process.env.AWS_REGION!,
@@ -48,25 +47,25 @@ async function createGitHubWebhook(
     if (webhooks.some((hook) => hook.config.url === webhookUrl)) {
       console.log("Webhook already exists for this repository.");
       return;
+    } else {
+      // Create webhook using direct request method
+      await octokit.request("POST /repos/{owner}/{repo}/hooks", {
+        owner,
+        repo,
+        config: {
+          url: webhookUrl,
+          secret,
+          content_type: "json",
+        },
+        events: ["push"],
+        active: true,
+        headers: {
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      });
+
+      console.log("Webhook created successfully.");
     }
-
-    // Create webhook using direct request method
-    await octokit.request("POST /repos/{owner}/{repo}/hooks", {
-      owner,
-      repo,
-      config: {
-        url: webhookUrl,
-        secret,
-        content_type: "json",
-      },
-      events: ["push"],
-      active: true,
-      headers: {
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    });
-
-    console.log("Webhook created successfully.");
   } catch (error: unknown) {
     // Type guard to check if error is an object with status property
     if (
@@ -74,39 +73,9 @@ async function createGitHubWebhook(
       "status" in error &&
       (error as { status: number }).status === 404
     ) {
-      try {
-        // Attempt to create the webhook directly if the repository is not found
-        await octokit.request("POST /repos/{owner}/{repo}/hooks", {
-          owner,
-          repo,
-          config: {
-            url: webhookUrl,
-            secret,
-            content_type: "json",
-          },
-          events: ["push"],
-          active: true,
-          headers: {
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        });
-        console.log("Webhook created successfully after 404 error.");
-      } catch (createError: unknown) {
-        // Handle potential error in webhook creation
-        if (createError instanceof Error) {
-          console.error(
-            "Failed to create GitHub webhook after 404:",
-            createError.message
-          );
-          throw new Error(
-            `Failed to create GitHub webhook: ${createError.message}`
-          );
-        }
-
-        // Fallback for any unexpected errors
-        console.error("Unexpected error creating webhook:", createError);
-        throw createError;
-      }
+      // Fallback for any unexpected errors
+      console.error("Unexpected error creating webhook:", error);
+      throw error;
     } else {
       // Handle other types of errors
       console.error("Failed to create GitHub webhook:", error);
@@ -182,6 +151,7 @@ export async function POST(req: NextRequest) {
       typeof environmentVariables === "string"
         ? JSON.parse(environmentVariables)
         : environmentVariables;
+
     const parsedData = DeploymentModel.safeParse({
       id: "",
       projectId,
@@ -208,6 +178,9 @@ export async function POST(req: NextRequest) {
     if (!project) {
       return NextResponse.json({ status: 404, message: "Project not found" });
     }
+
+    console.log(requestMaker);
+    
 
     if (requestMaker !== "webhook") {
       try {
@@ -290,16 +263,6 @@ export async function POST(req: NextRequest) {
     // }
 
     try {
-      if (!project.subDomain) {
-        const subDomain = generateSlug();
-
-        //Update project with slug
-        await prisma.project.update({
-          where: { id: projectId },
-          data: { subDomain },
-        });
-      }
-
       // Create a deployment record
       const deployment = await prisma.deployment.create({
         data: {
@@ -311,6 +274,7 @@ export async function POST(req: NextRequest) {
           environmentVariables: JSON.stringify(envVarsObject),
         },
       });
+
       await runDockerDeploymentWithCLI(
         deployment.id,
         process.env.AWS_ECR_IMAGE_URI!,
@@ -322,7 +286,11 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({
         status: 200,
         message: "Deployment started",
-        data: { deployment, subDomain: project.subDomain },
+        data: {
+          deployment,
+          subDomain: project.subDomain,
+          url: `http://${project.subDomain}.localhost:8000`,
+        },
       });
     } catch (error) {
       return NextResponse.json({
@@ -358,5 +326,38 @@ export async function POST(req: NextRequest) {
     // }
   } catch {
     return NextResponse.json({ status: 500, message: "Internal server error" });
+  }
+}
+
+// Update deployment status when the deployment is complete
+// Call this endpoint after the deployment is complete from Build Server
+export async function PATCH(req: NextRequest) {
+  try {
+    const deploymentId = req.nextUrl.searchParams.get("deploymentId");
+
+    if (!deploymentId) {
+      return NextResponse.json({
+        status: 400,
+        message: "deploymentId is required",
+      });
+    }
+
+    const deployment = await prisma.deployment.update({
+      where: { id: deploymentId },
+      data: {
+        deploymentStatus: DeploymentStatus.READY,
+      },
+    });
+
+    return NextResponse.json({
+      status: 200,
+      message: `Deployment with id ${deploymentId} is complete`,
+      data: deployment,
+    });
+  } catch (error) {
+    return NextResponse.json({
+      status: 500,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
   }
 }

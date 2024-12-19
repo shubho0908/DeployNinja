@@ -1,6 +1,7 @@
 import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ProjectModel } from "@/types/models/Project.model";
+import { generateSlug } from "random-word-slugs";
 
 // GET route to get all projects — Dashboard
 export async function GET(req: NextRequest) {
@@ -29,7 +30,8 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const validatedData = ProjectModel.safeParse(body);
+    const subDomain = generateSlug();
+    const validatedData = ProjectModel.safeParse({ ...body, subDomain });
 
     if (!validatedData.success) {
       return NextResponse.json({
@@ -53,6 +55,7 @@ export async function POST(req: NextRequest) {
         name,
         ownerId,
         framework,
+        subDomain,
         gitRepoUrl,
         installCommand,
         buildCommand,

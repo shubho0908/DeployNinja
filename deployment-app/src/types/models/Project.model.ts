@@ -5,6 +5,7 @@ export const ProjectModel = z.object({
   id: z.string(),
   name: z.string(),
   ownerId: z.string(),
+  subDomain: z.string(),
   framework: z.string(),
   installCommand: z.string(),
   buildCommand: z.string(),

@@ -6,10 +6,6 @@ export async function GET() {
   try {
     const session = await auth();
 
-    if (!session) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
-
     const isUserExists = await prisma.user.findFirst({
       where: { username: session?.username! },
     });
@@ -27,7 +23,7 @@ export async function GET() {
         username: session?.username!,
         profileImage: session?.user?.image!,
         isGithubConnected: true,
-        githubAccessToken: session.accessToken!,
+        githubAccessToken: session?.accessToken!,
       },
     });
 

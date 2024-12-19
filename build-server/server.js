@@ -8,7 +8,7 @@ const { Kafka, Partitioners } = require("kafkajs");
 const { createClient } = require("@clickhouse/client");
 const { randomUUID } = require("crypto");
 
-// Load AWS credentials from .env file
+// Load credentials from .env file
 const envPath = path.resolve(process.cwd(), ".env");
 const envConfig = dotenv.config({ path: envPath }).parsed || {};
 
@@ -22,7 +22,7 @@ const s3Client = new S3Client({
 });
 
 // Get project-related variables from process.env (Docker/ECS environment)
-const PROJECT_ID = process.env.PROJECT_ID;
+const PROJECT_URI = process.env.PROJECT_URI;
 const DEPLOYEMENT_ID = process.env.DEPLOYEMENT_ID;
 const PROJECT_INSTALL_COMMAND = process.env.PROJECT_INSTALL_COMMAND;
 const PROJECT_BUILD_COMMAND = process.env.PROJECT_BUILD_COMMAND;
@@ -55,22 +55,36 @@ const producer = kafka.producer({
 
 const consumer = kafka.consumer({ groupId: "build-logs-consumer" });
 
+// Flag to track upload completion
+let uploadComplete = false;
+
 async function publishLog(log) {
   try {
-    // Ensure the producer is connected before sending
     await producer.connect();
-
     await producer.send({
       topic: `build-logs`,
       messages: [
         {
           key: "log",
-          value: JSON.stringify({ PROJECT_ID, DEPLOYEMENT_ID, log }),
+          value: JSON.stringify({ PROJECT_URI, DEPLOYEMENT_ID, log }),
         },
       ],
     });
   } catch (error) {
     console.error("Error publishing log:", error);
+  }
+}
+
+async function cleanupAndExit() {
+  try {
+    console.log("Cleaning up resources before exit...");
+    await producer.disconnect();
+    await consumer.disconnect();
+    await client.close();
+    process.exit(0);
+  } catch (error) {
+    console.error("Error during cleanup:", error);
+    process.exit(1);
   }
 }
 
@@ -127,7 +141,7 @@ async function InitializeScript() {
 
             const command = new PutObjectCommand({
               Bucket: S3_BUCKET_NAME,
-              Key: `__outputs/${PROJECT_ID}/${file}`,
+              Key: `__outputs/${PROJECT_URI}/${file}`,
               Body: fs.createReadStream(filePath),
               ContentType: mime.lookup(filePath),
             });
@@ -137,24 +151,25 @@ async function InitializeScript() {
 
           console.log("Upload complete...");
           await publishLog("Upload complete...");
-
+          uploadComplete = true;
           resolve();
-          process.exit(0);
+          // Let the Kafka consumer handle the exit after processing the "Upload complete" message
         } catch (error) {
           console.error("Error in build process close handler:", error);
           reject(error);
-          process.exit(1);
+          await cleanupAndExit();
         }
       });
 
-      buildProcess.on("error", (error) => {
+      buildProcess.on("error", async (error) => {
         console.error("Execution error:", error);
         reject(error);
+        await cleanupAndExit();
       });
     });
   } catch (error) {
     console.error("Error in InitializeScript:", error);
-    throw error;
+    await cleanupAndExit();
   }
 }
 
@@ -163,8 +178,6 @@ const initializeKafkaConsumer = async () => {
     const event_id = randomUUID();
     await consumer.connect();
     await consumer.subscribe({ topic: "build-logs" });
-
-    let isUploadComplete = false;
 
     await consumer.run({
       eachBatch: async function ({
@@ -182,11 +195,6 @@ const initializeKafkaConsumer = async () => {
           const { DEPLOYEMENT_ID, log } = JSON.parse(stringMessage);
           console.log({ log, DEPLOYEMENT_ID });
 
-          // Check if upload is complete
-          if (log.includes("Upload complete")) {
-            isUploadComplete = true;
-          }
-
           try {
             const { query_id } = await client.insert({
               table: "log_events",
@@ -202,7 +210,6 @@ const initializeKafkaConsumer = async () => {
 
             console.log(query_id);
 
-            // Commit the offset for this specific message
             await commitOffsetsIfNecessary({
               topics: [
                 {
@@ -218,31 +225,29 @@ const initializeKafkaConsumer = async () => {
             });
 
             await heartbeat();
+
+            // Check for upload completion after processing each message
+            if (uploadComplete && log.includes("Upload complete")) {
+              console.log("Upload complete confirmed in Kafka consumer. Cleaning up...");
+              await cleanupAndExit();
+            }
           } catch (err) {
             console.log(err);
           }
         }
-
-        // Exit process if upload is complete
-        if (isUploadComplete) {
-          console.log("Upload complete. Exiting process...");
-          await consumer.disconnect();
-          process.exit(0);
-        }
       },
-      // Add a timeout to exit if no upload complete message is received
       autoCommit: false,
       eachBatchAutoResolve: true,
     });
 
     // Add a timeout to exit if process hangs
-    setTimeout(() => {
-      console.log("Timeout reached. Exiting process...");
-      process.exit(1);
+    setTimeout(async () => {
+      console.log("Timeout reached. Cleaning up and exiting...");
+      await cleanupAndExit();
     }, 30 * 60 * 1000); // 30 minutes timeout
   } catch (error) {
     console.error("Failed to initialize Kafka consumer:", error);
-    process.exit(1);
+    await cleanupAndExit();
   }
 };
 
