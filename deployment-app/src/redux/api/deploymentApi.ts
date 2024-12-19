@@ -7,6 +7,12 @@ export interface GetDeploymentsResponse {
   deployments: DeploymentModel[];
 }
 
+export interface UpdateDeploymentResponse {
+  status: number;
+  message: string;
+  data: DeploymentModel;
+}
+
 export const getDeployments = createAsyncThunk<
   GetDeploymentsResponse,
   string,
@@ -45,6 +51,23 @@ export const startDeployment = createAsyncThunk<
         }
       );
       return response.data as DeploymentModel;
+    } catch (error) {
+      const errorMessage = await handleApiError(error);
+      return rejectWithValue(errorMessage);
+    }
+  }
+);
+
+export const updateDeployment = createAsyncThunk<
+  UpdateDeploymentResponse,
+  string,
+  { rejectValue: string }
+>(
+  "deployment/updateDeployment",
+  async (deploymentId, { rejectWithValue }) => {
+    try {
+      const response = await API.patch(`/deploy?deploymentId=${deploymentId}`);
+      return response.data as UpdateDeploymentResponse;
     } catch (error) {
       const errorMessage = await handleApiError(error);
       return rejectWithValue(errorMessage);

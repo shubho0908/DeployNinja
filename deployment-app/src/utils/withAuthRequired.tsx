@@ -22,7 +22,10 @@ export default function withAuthRequired<P extends object>(
     // Authentication check effect
     useEffect(() => {
       if (status === "unauthenticated") {
-        router.push("/");
+        router.replace("/login");
+      }
+      else{
+        router.replace("/dashboard");
       }
     }, [status, router]);
 

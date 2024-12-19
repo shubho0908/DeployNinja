@@ -4,6 +4,8 @@ import {
   getDeployments,
   startDeployment,
   GetDeploymentsResponse,
+  updateDeployment,
+  UpdateDeploymentResponse,
 } from "@/redux/api/deploymentApi";
 
 interface DeploymentState {
@@ -32,6 +34,17 @@ const deploymentSlice = createSlice({
           state.deployments.push(action.payload);
         } else {
           state.deployments = [action.payload];
+        }
+      }
+    );
+    builder.addCase(
+      updateDeployment.fulfilled,
+      (state, action: PayloadAction<UpdateDeploymentResponse>) => {
+        if (state.deployments && action.payload.status === 200) {
+          const updatedDeployment = action.payload.data;
+          state.deployments = state.deployments.map((deployment) =>
+            deployment.id === updatedDeployment.id ? updatedDeployment : deployment
+          );
         }
       }
     );

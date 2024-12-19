@@ -1,7 +1,7 @@
 "use client";
 
-import withAuthRequired from "@/components/withAuthRequired";
-import Dashboard from "@/components/Dashboard";
+import withAuthRequired from "@/utils/withAuthRequired";
+import Dashboard from "@/components/pages/DashboardPage";
 
 function DashboardWrapper() {
   return <Dashboard />;

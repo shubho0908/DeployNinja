@@ -6,18 +6,19 @@ export async function middleware(request: NextRequest) {
   const path = request.nextUrl.pathname;
 
   // Skip auth check for webhook route
-  if (path.startsWith('/api/git/webhook') || path.startsWith('/api/deploy')) {
+  if (
+    path.startsWith("/api/git/webhook") ||
+    path.startsWith("/api/deploy") ||
+    path.startsWith("/api/login") || path.startsWith("/api/auth")
+  ) {
     return NextResponse.next();
   }
 
   // Handle other API routes that require session auth
-  if (path.startsWith('/api')) {
+  if (path.startsWith("/api")) {
     const session = await auth();
     if (!session) {
-      return NextResponse.json(
-        { error: "Not authenticated" },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
   }
 
@@ -25,5 +26,5 @@ export async function middleware(request: NextRequest) {
 }
 
 export const config = {
-  matcher: ['/api/:path*'],
+  matcher: ["/api/:path*"],
 };

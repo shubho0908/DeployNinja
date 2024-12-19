@@ -6,6 +6,11 @@ export interface GetProjectsResponse {
   projects: Project[];
 }
 
+export interface DeleteProjectResponse {
+  status: number;
+  message: string;
+}
+
 export const getProjects = createAsyncThunk<
   GetProjectsResponse,
   string,
@@ -35,13 +40,13 @@ export const createProject = createAsyncThunk<
 });
 
 export const deleteProject = createAsyncThunk<
-  { success: boolean },
+  DeleteProjectResponse,
   string,
   { rejectValue: string }
 >("project/deleteProject", async (projectId, { rejectWithValue }) => {
   try {
     const response = await API.delete(`/project?projectId=${projectId}`);
-    return { success: response.data.success };
+    return response.data as DeleteProjectResponse;
   } catch (error) {
     const errorMessage = await handleApiError(error);
     return rejectWithValue(errorMessage);
