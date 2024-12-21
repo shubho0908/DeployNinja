@@ -3,16 +3,26 @@ const httpProxy = require("http-proxy");
 const app = express();
 const dotenv = require("dotenv");
 const path = require("path");
+const cors = require("cors");
 
 // Load credentials from .env file
 const envPath = path.resolve(process.cwd(), ".env");
 const envConfig = dotenv.config({ path: envPath }).parsed || {};
 
 const PORT = 8000;
-const BASE_PATH = 'https://deployment-app-build.s3.eu-north-1.amazonaws.com/__outputs';
+const BASE_PATH =
+  "https://deployment-app-build.s3.eu-north-1.amazonaws.com/__outputs";
 
 // Create a proxy server
 const proxy = httpProxy.createProxy();
+
+app.use(
+  cors({
+    origin: "*",
+    methods: "GET,HEAD,PUT,PATCH,POST,DELETE",
+    allowedHeaders: "Content-Type,Authorization",
+  })
+);
 
 app.use((req, res) => {
   const hostname = req.hostname;

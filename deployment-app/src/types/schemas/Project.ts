@@ -1,8 +1,8 @@
 import { z } from "zod";
-import { DeploymentModel } from "./Deployment.model";
+import { DeploymentModel } from "./Deployment";
 
 export const ProjectModel = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   name: z.string(),
   ownerId: z.string(),
   subDomain: z.string(),

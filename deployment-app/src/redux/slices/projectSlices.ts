@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { Project } from "@/types/models/Project.model";
+import { Project } from "@/types/schemas/Project";
 import {
   getProjects,
   createProject,

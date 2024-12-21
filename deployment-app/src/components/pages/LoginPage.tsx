@@ -50,7 +50,6 @@ export default function LoginPage() {
     { icon: <Rocket className="h-4 w-4" />, text: "Start Deploying Instantly" },
   ];
 
-
   if (loading || session) {
     return null;
   }
@@ -138,26 +137,6 @@ export default function LoginPage() {
                 <Github className="mr-2 h-5 w-5" />
                 Continue with GitHub
               </span>
-            </Button>
-
-            <div className="relative">
-              <div className="absolute inset-0 flex items-center">
-                <div className="w-full border-t"></div>
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-background px-2 text-muted-foreground">
-                  Or continue with
-                </span>
-              </div>
-            </div>
-
-            <Button
-              variant="outline"
-              className="w-full"
-              onClick={() => router.push("/dashboard")}
-            >
-              Continue as Guest
-              <ArrowRight className="ml-2 h-4 w-4" />
             </Button>
           </div>
         </motion.div>

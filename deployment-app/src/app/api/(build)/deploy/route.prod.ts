@@ -1,5 +1,5 @@
 import { prisma } from "@/lib/prisma";
-import { DeploymentModel } from "@/types/models/Deployment.model";
+import { DeploymentModel } from "@/types/schemas/Deployment";
 import { fetchGitLatestCommit } from "@/utils/github";
 import { ECSClient, RunTaskCommand } from "@aws-sdk/client-ecs";
 import { DeploymentStatus } from "@prisma/client";

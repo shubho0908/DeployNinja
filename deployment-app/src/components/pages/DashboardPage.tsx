@@ -7,7 +7,6 @@ import Link from "next/link";
 import { ProjectCard } from "@/components/project-card";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
-import { useEffect } from "react";
 
 export default function DashboardPage() {
   const { user } = useSelector((state: RootState) => state.user);
@@ -15,12 +14,12 @@ export default function DashboardPage() {
 
   return (
     <div className="min-h-screen p-8">
-      <div className="max-w-7xl mx-auto">
+      <div className="max-w-7xl relative top-16 mx-auto">
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">{user?.name}'s Projects</h1>
-          <Button asChild>
+          <Button asChild className="bg-primary text-primary-foreground">
             <Link href="/dashboard/create-project">
-              <Plus className="mr-2 h-4 w-4" />
+              <Plus className="h-4 w-4" />
               New Project
             </Link>
           </Button>

@@ -155,14 +155,14 @@ async function InitializeScript() {
           }, 2000);
         } catch (error) {
           console.error("Error in build process:", error);
-          await publishLog(`Error: ${error.message}`);
+          await publishLog(`Error in build process: ${error.message}`);
           await forceExit();
         }
       });
 
       buildProcess.on("error", async (error) => {
         console.error("Execution error:", error);
-        await publishLog(`Error: ${error.message}`);
+        await publishLog(`Execution error: ${error.message}`);
         await forceExit();
       });
     });

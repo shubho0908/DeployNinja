@@ -1,5 +1,5 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { DeploymentModel } from "@/types/models/Deployment.model";
+import { DeploymentModel } from "@/types/schemas/Deployment";
 import { API, handleApiError } from "./util";
 import { auth } from "@/auth";
 
@@ -22,7 +22,7 @@ export const getDeployments = createAsyncThunk<
   async (projectId, { rejectWithValue }) => {
     try {
       const response = await API.get(`/deploy?projectId=${projectId}`);
-      return { deployments: response.data } as GetDeploymentsResponse;
+      return { deployments: response.data.data } as GetDeploymentsResponse;
     } catch (error) {
       const errorMessage = await handleApiError(error);
       return rejectWithValue(errorMessage);

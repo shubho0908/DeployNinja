@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 export const UserModel = z.object({
-  id: z.string(),
+  id: z.string().optional(),
   name: z.string(),
   username: z.string(),
   profileImage: z.string(),

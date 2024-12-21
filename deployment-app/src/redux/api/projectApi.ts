@@ -1,5 +1,5 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
-import { Project } from "@/types/models/Project.model";
+import { Project } from "@/types/schemas/Project";
 import { API, handleApiError } from "./util";
 
 export interface GetProjectsResponse {

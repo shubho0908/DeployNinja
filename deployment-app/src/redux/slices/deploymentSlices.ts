@@ -1,5 +1,5 @@
 import { createSlice, PayloadAction } from "@reduxjs/toolkit";
-import { DeploymentModel } from "@/types/models/Deployment.model";
+import { DeploymentModel } from "@/types/schemas/Deployment";
 import {
   getDeployments,
   startDeployment,

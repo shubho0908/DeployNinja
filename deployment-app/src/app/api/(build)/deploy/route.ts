@@ -1,11 +1,12 @@
 import { prisma } from "@/lib/prisma";
-import { DeploymentModel } from "@/types/models/Deployment.model";
+import { DeploymentModel } from "@/types/schemas/Deployment";
 import { fetchGitLatestCommit } from "@/utils/github";
 import { ECSClient, RunTaskCommand } from "@aws-sdk/client-ecs";
 import { DeploymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { Octokit } from "@octokit/rest";
 import { exec } from "child_process";
+import { handleApiError } from "@/redux/api/util";
 
 const ecsClient = new ECSClient({
   region: process.env.AWS_REGION!,
@@ -117,6 +118,31 @@ async function runDockerDeploymentWithCLI(
   }
 }
 
+export async function GET(req: NextRequest) {
+  try {
+    const searchParams = req.nextUrl.searchParams;
+    const projectId = searchParams.get("projectId");
+
+    if (!projectId) {
+      return NextResponse.json({
+        status: 400,
+        message: "projectId is required",
+      });
+    }
+
+    const deployments = await prisma.deployment.findMany({
+      where: { projectId },
+    });
+
+    return NextResponse.json({ status: 200, data: deployments });
+  } catch (error) {
+    return NextResponse.json({
+      status: 500,
+      message: error instanceof Error ? error.message : "Internal server error",
+    });
+  }
+}
+
 // POST route to start a deployment
 export async function POST(req: NextRequest) {
   try {
@@ -137,8 +163,8 @@ export async function POST(req: NextRequest) {
     const {
       projectId,
       gitBranchName,
-      gitRepoUrl,
       gitCommitHash,
+      deploymentStatus,
       // buildCommand,
       // installCommand,
       // projectRootDir,
@@ -156,8 +182,8 @@ export async function POST(req: NextRequest) {
       id: "",
       projectId,
       gitBranchName,
-      gitRepoUrl,
       gitCommitHash,
+      deploymentStatus,
       environmentVariables: envVarsObject,
     });
 
@@ -179,32 +205,28 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ status: 404, message: "Project not found" });
     }
 
-    console.log(requestMaker);
-    
+    // TODO: add if request maker is webhook
+    try {
+      const webhookUrl = `${process.env.WEBHOOK_BASE_URL}/api/git/webhook?projectId=${projectId}`;
+      const webhookSecret = process.env.WEBHOOK_SECRET!;
 
-    if (requestMaker !== "webhook") {
-      try {
-        const webhookUrl = `${process.env.WEBHOOK_BASE_URL}/api/git/webhook?projectId=${projectId}&token=${accessToken}`;
-        const webhookSecret = process.env.WEBHOOK_SECRET!;
-
-        await createGitHubWebhook(
-          gitRepoUrl,
-          webhookSecret,
-          webhookUrl,
-          accessToken
-        );
-      } catch (error) {
-        return NextResponse.json({
-          status: 500,
-          message:
-            error instanceof Error ? error.message : "Unknown error occurred",
-        });
-      }
+      await createGitHubWebhook(
+        project.gitRepoUrl,
+        webhookSecret,
+        webhookUrl,
+        accessToken
+      );
+    } catch (error) {
+      return NextResponse.json({
+        status: 500,
+        message:
+          error instanceof Error ? error.message : "Unknown error occurred",
+      });
     }
 
     const gitInfo = await fetchGitLatestCommit({
       accessToken,
-      repoUrl: gitRepoUrl,
+      repoUrl: project.gitRepoUrl,
       branch: gitBranchName,
     });
 
@@ -268,10 +290,13 @@ export async function POST(req: NextRequest) {
         data: {
           projectId,
           gitBranchName,
-          gitCommitHash,
+          gitCommitHash: gitInfo.latestCommit,
           deploymentStatus: DeploymentStatus.IN_PROGRESS,
           deploymentMessage: "Deployment has been started",
-          environmentVariables: JSON.stringify(envVarsObject),
+          environmentVariables: JSON.stringify({
+            ...envVarsObject,
+            PROJECT_URI: project.subDomain,
+          }),
         },
       });
 
@@ -293,6 +318,17 @@ export async function POST(req: NextRequest) {
         },
       });
     } catch (error) {
+      // Create a deployment record
+      await prisma.deployment.create({
+        data: {
+          projectId,
+          gitBranchName,
+          gitCommitHash: gitInfo.latestCommit,
+          deploymentStatus: DeploymentStatus.FAILED,
+          deploymentMessage: "Deployment has been started",
+          environmentVariables: JSON.stringify(envVarsObject),
+        },
+      });
       return NextResponse.json({
         status: 500,
         message: "Failed to start deployment",
@@ -324,16 +360,17 @@ export async function POST(req: NextRequest) {
     //       error instanceof Error ? error.message : "Unknown error occurred",
     //   });
     // }
-  } catch {
-    return NextResponse.json({ status: 500, message: "Internal server error" });
+  } catch (error) {
+    throw new Error(await handleApiError(error));
   }
 }
 
-// Update deployment status when the deployment is complete
+// Update deployment status when the deployment is complete/failed
 // Call this endpoint after the deployment is complete from Build Server
 export async function PATCH(req: NextRequest) {
   try {
     const deploymentId = req.nextUrl.searchParams.get("deploymentId");
+    const { deploymentStatus } = await req.json();
 
     if (!deploymentId) {
       return NextResponse.json({
@@ -342,16 +379,22 @@ export async function PATCH(req: NextRequest) {
       });
     }
 
+    if (!deploymentStatus) {
+      return NextResponse.json({
+        status: 400,
+        message: "deploymentStatus is required",
+      });
+    }
+
     const deployment = await prisma.deployment.update({
       where: { id: deploymentId },
       data: {
-        deploymentStatus: DeploymentStatus.READY,
+        deploymentStatus: deploymentStatus as DeploymentStatus,
       },
     });
 
     return NextResponse.json({
       status: 200,
-      message: `Deployment with id ${deploymentId} is complete`,
       data: deployment,
     });
   } catch (error) {

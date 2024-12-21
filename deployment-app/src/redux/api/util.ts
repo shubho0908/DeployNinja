@@ -1,5 +1,4 @@
-import { auth } from "@/auth";
-import axios, { InternalAxiosRequestConfig } from "axios";
+import axios from "axios";
 
 // Base URL for API requests
 const BASE_URL = process.env.NEXT_PUBLIC_URL;

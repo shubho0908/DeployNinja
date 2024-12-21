@@ -1,6 +1,6 @@
 import { createAsyncThunk } from "@reduxjs/toolkit";
 import { API, handleApiError } from "./util";
-import { User } from "@/types/models/User.model";
+import { User } from "@/types/schemas/User";
 
 export interface GetUserResponse {
   user: User;

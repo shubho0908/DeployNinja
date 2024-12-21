@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Navbar } from "@/components/navbar";
 import { Button } from "@/components/ui/button";
 import {
   ArrowRight,
@@ -99,9 +98,7 @@ export default function Home() {
 
   return (
     <main className="min-h-screen">
-      <Navbar />
-
-      <section className="pt-32 pb-16">
+      <section className="relative top-32 pb-16">
         <div className="container mx-auto px-4">
           <motion.div
             className="text-center max-w-3xl mx-auto"

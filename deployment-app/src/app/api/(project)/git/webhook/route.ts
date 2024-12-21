@@ -2,6 +2,7 @@ import crypto from "crypto";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchGitLatestCommit } from "@/utils/github";
+import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
 
 // Verify GitHub webhook signature
 function verifyGitHubWebhook(req: NextRequest, payload: string): boolean {
@@ -31,8 +32,14 @@ export async function POST(req: NextRequest) {
   try {
     const payload = await req.text();
     const projectId = req.nextUrl.searchParams.get("projectId");
-    const accessToken = req.nextUrl.searchParams.get("token");
     const eventType = req.headers.get("X-GitHub-Event");
+
+    const projectData = await prisma.project.findUnique({
+      where: { id: projectId! },
+      include: { owner: true },
+    });
+
+    const accessToken = projectData?.owner?.githubAccessToken;
 
     if (!accessToken) {
       return NextResponse.json({ status: 401, message: "Unauthorized" });
@@ -91,6 +98,7 @@ export async function POST(req: NextRequest) {
       buildCommand: project?.buildCommand || "npm run build",
       installCommand: project?.installCommand || "npm install",
       projectRootDir: project?.projectRootDir || "./",
+      deploymentStatus: "IN_PROGRESS" as DeploymentStatus,
       environmentVariables: project.deployments[0]?.environmentVariables || {},
     };
 
