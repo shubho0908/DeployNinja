@@ -18,7 +18,6 @@ import {
   Rocket,
   ArrowLeft,
   Loader2,
-  Github,
 } from "lucide-react";
 import Link from "next/link";
 import {
@@ -39,8 +38,10 @@ import { DeploymentModel } from "@/types/schemas/Deployment";
 import { container, frameworks, item } from "@/utils/constants";
 import { EnvVar, Repository } from "@/types/schemas/Repository";
 import { useRouter } from "next/navigation";
+import { startDeployment } from "@/redux/api/deploymentApi";
+import { useAppDispatch } from "@/redux/hooks";
 
-export default function ProjectPage() {
+export default function CreateProjectCard() {
   const [envVars, setEnvVars] = useState<EnvVar[]>([{ key: "", value: "" }]);
   const [selectedFramework, setSelectedFramework] = useState("Next.js");
   const [repositories, setRepositories] = useState<Repository[]>([]);
@@ -54,6 +55,7 @@ export default function ProjectPage() {
   const { data: session } = useSession();
   const { user } = useSelector((state: RootState) => state.user);
   const router = useRouter();
+  const dispatch = useAppDispatch();
 
   useEffect(() => {
     const fetchRepositories = async () => {
@@ -117,22 +119,6 @@ export default function ProjectPage() {
     }
   };
 
-  const createDeployment = async (
-    project: Project,
-    deploymentParams: DeploymentModel
-  ) => {
-    try {
-      await API.post(`/deploy?projectId=${project.id}`, deploymentParams, {
-        headers: {
-          Authorization: `Bearer ${session?.accessToken}`,
-          "X-Request-Maker": "user",
-        },
-      });
-    } catch (error) {
-      throw new Error(await handleApiError(error));
-    }
-  };
-
   const handleSubmit = async () => {
     setIsSubmitting(true);
     if (!selectedRepo) {
@@ -187,9 +173,21 @@ export default function ProjectPage() {
         },
       };
 
-      await createDeployment(project, deploymentParams);
+      const deployment = await dispatch(
+        startDeployment({
+          projectId: project?.id,
+          deploymentParams,
+          requestMaker: "user",
+        })
+      ).unwrap();
+      console.log(deployment.id);
+
+      if (!deployment || !deployment?.id) {
+        throw new Error("Deployment ID not received from server");
+      }
+
       toast.success("Project created successfully!");
-      router.replace(`/project/${project.id}`);
+      router.push(`/deployments/${deployment.id}`);
     } catch (error) {
       console.error("Error creating project:", error);
       setIsSubmitting(false);
@@ -219,9 +217,9 @@ export default function ProjectPage() {
               </div>
             </div>
             <Button variant="ghost" size="sm" asChild>
-              <Link href="/dashboard" className="flex items-center gap-2">
+              <Link href="/projects" className="flex items-center gap-2">
                 <ArrowLeft className="h-4 w-4" />
-                Back to Dashboard
+                Back to Projects
               </Link>
             </Button>
           </div>

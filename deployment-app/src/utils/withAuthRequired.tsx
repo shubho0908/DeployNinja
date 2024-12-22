@@ -25,7 +25,7 @@ export default function withAuthRequired<P extends object>(
         const isAuthPage =
           window.location.pathname === "/" ||
           window.location.pathname.includes("/login");
-        router.replace(isAuthPage ? "/dashboard" : "/login");
+        router.replace(isAuthPage ? "/projects" : "/login");
         return;
       }
 

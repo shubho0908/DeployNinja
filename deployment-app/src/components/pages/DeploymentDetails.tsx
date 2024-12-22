@@ -1,10 +1,12 @@
+"use client";
+
 import { RootState } from "@/app/store";
 import { useSelector } from "react-redux";
 import { Button } from "../ui/button";
 import Link from "next/link";
 import { useAppDispatch } from "@/redux/hooks";
 import { useEffect, useMemo, useState } from "react";
-import { getDeployments } from "@/redux/api/deploymentApi";
+import { getDeployments, updateDeployment } from "@/redux/api/deploymentApi";
 import { formatDistanceToNow } from "date-fns";
 import {
   Accordion,
@@ -18,7 +20,7 @@ import {
   ExternalLink,
   Github,
   Loader2,
-  Pencil,
+  OctagonXIcon,
 } from "lucide-react";
 import { API } from "@/redux/api/util";
 import { z } from "zod";
@@ -35,7 +37,7 @@ const BuildLogSchema = z.object({
 type BuildLog = z.infer<typeof BuildLogSchema>;
 
 // Component
-function ProjectDetails({ projectId }: { projectId: string }) {
+function ProjectDetails({ deploymentId }: { deploymentId: string }) {
   // Redux
   const dispatch = useAppDispatch();
   const { projects } = useSelector((state: RootState) => state.projects);
@@ -47,21 +49,14 @@ function ProjectDetails({ projectId }: { projectId: string }) {
 
   // Memoized values
   const project = useMemo(
-    () => projects?.find((p) => p.id === projectId),
-    [projects, projectId]
+    () =>
+      projects?.find((p) => p.deployments?.some((d) => d.id === deploymentId)),
+    [projects, deploymentId]
   );
 
-  const sortedDeployments = useMemo(() => {
-    return project?.deployments
-      ?.filter((d) => d.projectId === project?.id)
-      .sort(
-        (a, b) =>
-          new Date(b.updatedAt || 0).getTime() -
-          new Date(a.updatedAt || 0).getTime()
-      );
-  }, [project?.deployments, project?.id]);
-
-  const latestDeployment = sortedDeployments?.[0];
+  const latestDeployment = useMemo(() => {
+    return project?.deployments?.find((d) => d.id === deploymentId) || null;
+  }, [project?.deployments, deploymentId]);
 
   // Fetch deployments
   useEffect(() => {
@@ -75,6 +70,7 @@ function ProjectDetails({ projectId }: { projectId: string }) {
     if (!latestDeployment?.id) return;
 
     let pollingInterval: NodeJS.Timeout | undefined;
+    let pollingStartTime: number | undefined;
 
     const fetchBuildLogs = async () => {
       setIsLoading(true);
@@ -84,6 +80,21 @@ function ProjectDetails({ projectId }: { projectId: string }) {
         );
         setBuildLogs(data?.logs);
 
+        // Check if polling duration exceeds 30 seconds
+        if (pollingStartTime && Date.now() - pollingStartTime > 60000) {
+          dispatch(
+            updateDeployment({
+              deploymentId: latestDeployment.id!,
+              deploymentStatus: "FAILED",
+            })
+          );
+          setIsPolling(false);
+          if (pollingInterval) {
+            clearInterval(pollingInterval);
+          }
+          return;
+        }
+
         if (["READY", "FAILED"].includes(latestDeployment.deploymentStatus)) {
           setIsPolling(false);
           if (pollingInterval) {
@@ -92,9 +103,10 @@ function ProjectDetails({ projectId }: { projectId: string }) {
         } else if (
           data?.logs.some((log: any) =>
             log.log.includes("Upload complete...")
-          ) || data?.logs.some((log: any) => /error/i.test(log.log))
+          ) ||
+          data?.logs.some((log: any) => /error/i.test(log.log))
         ) {
-          dispatch(getDeployments(projectId));
+          dispatch(getDeployments(project?.id!));
         }
       } catch (error) {
         console.error("Failed to fetch build logs:", error);
@@ -113,6 +125,7 @@ function ProjectDetails({ projectId }: { projectId: string }) {
 
     if (shouldStartPolling && !isPolling) {
       setIsPolling(true);
+      pollingStartTime = Date.now(); // Set the polling start time
       fetchBuildLogs();
       pollingInterval = setInterval(fetchBuildLogs, 5000);
     } else if (
@@ -129,7 +142,7 @@ function ProjectDetails({ projectId }: { projectId: string }) {
   }, [
     latestDeployment?.id,
     latestDeployment?.deploymentStatus,
-    projectId,
+    project?.id,
     dispatch,
   ]);
 
@@ -168,10 +181,10 @@ function ProjectDetails({ projectId }: { projectId: string }) {
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white p-8">
       <div className="max-w-6xl relative top-16 mx-auto space-y-6">
         {/* Header */}
-        <Link href="/dashboard">
+        <Link href="/projects">
           <Button variant="secondary" size="sm">
             <ChevronLeft />
-            Dashboard
+            All Projects
           </Button>
         </Link>
         <div className="flex justify-between items-center">
@@ -189,14 +202,13 @@ function ProjectDetails({ projectId }: { projectId: string }) {
                   Repository
                 </HeaderButton>
               )}
-              {["Visit"].map((label) => (
-                <HeaderButton
-                  href={`http://${project?.subDomain}.localhost:8000`}
-                  key={label}
-                >
-                  <ExternalLink className="h-4 w-4" />
-                  {label}
-                </HeaderButton>
+              {["All Deployments"].map((label) => (
+                <Link href={`/deployments?id=${project?.id}`}>
+                  <Button variant="secondary">
+                    <ExternalLink className="h-4 w-4" />
+                    {label}
+                  </Button>
+                </Link>
               ))}
             </div>
           </div>
@@ -207,11 +219,9 @@ function ProjectDetails({ projectId }: { projectId: string }) {
               {/* Preview */}
               <div className="bg-zinc-50 dark:bg-zinc-900 rounded-md p-8">
                 {project?.subDomain && (
-                  <iframe
-                    src={`https://${project.subDomain}.localhost:8000`}
-                    className="w-full h-64 rounded"
-                    title="Project Preview"
-                  />
+                  <div className="w-full h-64 rounded flex items-center justify-center">
+                    <p className="italic">Preview isn't available yet</p>
+                  </div>
                 )}
               </div>
 
@@ -284,11 +294,13 @@ function ProjectDetails({ projectId }: { projectId: string }) {
               <AccordionTrigger className="px-4 hover:no-underline border-b hover:bg-zinc-100 dark:hover:bg-zinc-900/50">
                 <div className="flex justify-between items-center w-full">
                   <span>Build Logs</span>
-                  <div className="flex items-center gap-2">
+                  <div className="flex items-center gap-2 mr-1">
                     {isLoading || isPolling ? (
-                      <Loader2 className="h-5 w-5 mr-2 animate-spin text-blue-500" />
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                    ) : latestDeployment?.deploymentStatus === "FAILED" ? (
+                      <OctagonXIcon className="h-5 w-5 text-red-500" />
                     ) : (
-                      <CheckCircle2 className="h-5 mr-2 w-5 text-blue-500" />
+                      <CheckCircle2 className="h-5 w-5 text-blue-500" />
                     )}
                   </div>
                 </div>
@@ -325,11 +337,15 @@ function ProjectDetails({ projectId }: { projectId: string }) {
               <AccordionTrigger className="px-4 hover:no-underline border-b hover:bg-zinc-100 dark:hover:bg-zinc-900/50">
                 <div className="flex justify-between items-center w-full">
                   <span>Assigning Custom Domains</span>
-                  {isLoading || isPolling ? (
-                    <Loader2 className="h-5 w-5 mr-2 animate-spin text-blue-500" />
-                  ) : (
-                    <CheckCircle2 className="h-5 mr-2 w-5 text-blue-500" />
-                  )}
+                  <div className="flex items-center gap-2 mr-1">
+                    {isLoading || isPolling ? (
+                      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
+                    ) : latestDeployment?.deploymentStatus === "FAILED" ? (
+                      <OctagonXIcon className="h-5 w-5 text-red-500" />
+                    ) : (
+                      <CheckCircle2 className="h-5 w-5 text-blue-500" />
+                    )}
+                  </div>
                 </div>
               </AccordionTrigger>
               <AccordionContent className="bg-zinc-50 dark:bg-zinc-900/50 p-4">
@@ -350,7 +366,7 @@ function ProjectDetails({ projectId }: { projectId: string }) {
                   </div>
                   <div className="editable">
                     <EditSubdomainDialog
-                      projectId={projectId}
+                      projectId={project?.id!}
                       deploymentId={latestDeployment?.id || ""}
                       currentSubdomain={project?.subDomain || ""}
                       onSuccess={() => {

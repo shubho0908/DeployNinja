@@ -34,6 +34,7 @@ model Project {
   framework      String
   subDomain      String       @unique
   gitRepoUrl     String
+  webhookId      Int?
   installCommand String?
   buildCommand   String?
   projectRootDir String?

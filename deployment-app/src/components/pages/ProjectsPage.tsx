@@ -8,7 +8,7 @@ import { ProjectCard } from "@/components/project-card";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
 
-export default function DashboardPage() {
+export default function ProjectsPage() {
   const { user } = useSelector((state: RootState) => state.user);
   const { projects } = useSelector((state: RootState) => state.projects);
 
@@ -18,7 +18,7 @@ export default function DashboardPage() {
         <div className="flex justify-between items-center mb-8">
           <h1 className="text-3xl font-bold">{user?.name}'s Projects</h1>
           <Button asChild className="bg-primary text-primary-foreground">
-            <Link href="/dashboard/create-project">
+            <Link href="/projects/create">
               <Plus className="h-4 w-4" />
               New Project
             </Link>

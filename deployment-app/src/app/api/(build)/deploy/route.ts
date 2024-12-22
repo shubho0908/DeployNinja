@@ -18,6 +18,7 @@ const ecsClient = new ECSClient({
 
 // Function to create a Github webhook for a given repository
 async function createGitHubWebhook(
+  projectId: string,
   repoUrl: string,
   secret: string,
   webhookUrl: string,
@@ -50,22 +51,30 @@ async function createGitHubWebhook(
       return;
     } else {
       // Create webhook using direct request method
-      await octokit.request("POST /repos/{owner}/{repo}/hooks", {
-        owner,
-        repo,
-        config: {
-          url: webhookUrl,
-          secret,
-          content_type: "json",
-        },
-        events: ["push"],
-        active: true,
-        headers: {
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
+      const webhook = await octokit.request(
+        "POST /repos/{owner}/{repo}/hooks",
+        {
+          owner,
+          repo,
+          config: {
+            url: webhookUrl,
+            secret,
+            content_type: "json",
+          },
+          events: ["push"],
+          active: true,
+          headers: {
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        }
+      );
+
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { webhookId: webhook.data.id },
       });
 
-      console.log("Webhook created successfully.");
+      console.log("Webhook created successfully. ", webhook.data.id);
     }
   } catch (error: unknown) {
     // Type guard to check if error is an object with status property
@@ -211,6 +220,7 @@ export async function POST(req: NextRequest) {
       const webhookSecret = process.env.WEBHOOK_SECRET!;
 
       await createGitHubWebhook(
+        projectId,
         project.gitRepoUrl,
         webhookSecret,
         webhookUrl,
@@ -293,17 +303,19 @@ export async function POST(req: NextRequest) {
           gitCommitHash: gitInfo.latestCommit,
           deploymentStatus: DeploymentStatus.IN_PROGRESS,
           deploymentMessage: "Deployment has been started",
-          environmentVariables: JSON.stringify({
-            ...envVarsObject,
-            PROJECT_URI: project.subDomain,
-          }),
+          environmentVariables: JSON.stringify(envVarsObject),
         },
       });
+
+      const envVarsObjectWithProjectUri = {
+        ...envVarsObject,
+        PROJECT_URI: project.subDomain,
+      };
 
       await runDockerDeploymentWithCLI(
         deployment.id,
         process.env.AWS_ECR_IMAGE_URI!,
-        envVarsObject
+        envVarsObjectWithProjectUri
       );
 
       console.log("Deployment created successfully:", deployment);

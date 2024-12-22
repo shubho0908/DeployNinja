@@ -35,7 +35,7 @@ export default function LoginPage() {
     } else {
       setLoading(false);
       if (session) {
-        router.replace("/dashboard");
+        router.replace("/projects");
       }
     }
   }, [session, status, router]);

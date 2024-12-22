@@ -8,6 +8,9 @@ import {
   ListObjectsV2Command,
   CopyObjectCommand,
 } from "@aws-sdk/client-s3";
+import { Octokit } from "@octokit/rest";
+import { auth } from "@/auth";
+import { handleApiError } from "@/redux/api/util";
 
 // Check if required environment variables are defined
 if (
@@ -209,11 +212,14 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!existingDeployment) {
-      return NextResponse.json({ status: 404, message: "Deployment not found" });
+      return NextResponse.json({
+        status: 404,
+        message: "Deployment not found",
+      });
     }
 
     // Parse existing environment variables
-    const currentEnvVars = existingDeployment.environmentVariables 
+    const currentEnvVars = existingDeployment.environmentVariables
       ? JSON.parse(existingDeployment.environmentVariables)
       : {};
 
@@ -244,6 +250,10 @@ export async function PATCH(req: NextRequest) {
 // DELETE route to delete a project
 export async function DELETE(req: NextRequest) {
   try {
+    const session = await auth();
+    const octokit = new Octokit({
+      auth: session?.accessToken,
+    });
     const projectId = req.nextUrl.searchParams.get("projectId");
 
     if (!projectId) {
@@ -255,10 +265,27 @@ export async function DELETE(req: NextRequest) {
 
     const project = await prisma.project.findUnique({
       where: { id: projectId },
+      include: { owner: true },
     });
 
     if (!project) {
       return NextResponse.json({ status: 404, message: `Project not found` });
+    }
+
+    // Delete webhook if it exists
+    if (project.webhookId) {
+      const [owner, repo] = project.gitRepoUrl
+        .replace("https://github.com/", "")
+        .split("/");
+      try {
+        await octokit.request("DELETE /repos/{owner}/{repo}/hooks/{hook_id}", {
+          owner,
+          repo,
+          hook_id: project.webhookId,
+        });
+      } catch (error) {
+        throw new Error(await handleApiError(error));
+      }
     }
 
     const folderPrefix = `__outputs/${project.subDomain}/`;

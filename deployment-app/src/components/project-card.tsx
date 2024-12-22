@@ -2,7 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
-import { Trash, GithubIcon, Loader2 } from "lucide-react";
+import { Trash, GithubIcon, Loader2, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { Project } from "@/types/schemas/Project";
 import { useRouter } from "next/navigation";
@@ -24,6 +24,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { late } from "zod";
 
 interface ProjectCardProps {
   project: Project;
@@ -68,12 +69,6 @@ export function ProjectCard({ project }: ProjectCardProps) {
     }
   };
 
-  const handleCardClick = () => {
-    if (!isDialogOpen) {
-      router.push(`/project/${project.id}`);
-    }
-  };
-
   const handleDeleteClick = (e: React.MouseEvent) => {
     e.preventDefault();
     e.stopPropagation();
@@ -92,8 +87,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
     return sortedDeployments[0];
   };
 
-  // Example usage
   const latestDeployment = getLatestDeployment();
+
+  const handleCardClick = () => {
+    if (!isDialogOpen) {
+      router.push(`/deployments/${latestDeployment?.id}`);
+    }
+  };
 
   return (
     <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
@@ -202,9 +202,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
               formatDistanceToNow(new Date(project.createdAt))}{" "}
             ago
           </p>
-          <p className="text-sm text-muted-foreground mt-3 ml-1">
-            {latestDeployment?.gitCommitHash?.slice(0, 7)}
-          </p>
+          <div className="flex items-end gap-2">
+            <p className="text-sm text-muted-foreground mt-3 ml-1">
+              {latestDeployment?.gitCommitHash?.slice(0, 7)}
+            </p>
+            <span className="flex items-center gap-2 text-sm">
+              <GitBranch className="w-4 text-primary" />
+              {latestDeployment?.gitBranchName}
+            </span>
+          </div>
         </CardContent>
       </Card>
     </motion.div>
