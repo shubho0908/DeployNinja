@@ -11,6 +11,12 @@ export interface DeleteProjectResponse {
   message: string;
 }
 
+export interface UpdateProjectPayload {
+  projectId: string;
+  deploymentId: string;
+  newSubDomain: string;
+}
+
 export const getProjects = createAsyncThunk<
   GetProjectsResponse,
   string,
@@ -32,7 +38,24 @@ export const createProject = createAsyncThunk<
 >("project/createProject", async (project, { rejectWithValue }) => {
   try {
     const response = await API.post("/project", project);
-    return response.data as Project;
+    return response.data.project as Project;
+  } catch (error) {
+    const errorMessage = await handleApiError(error);
+    return rejectWithValue(errorMessage);
+  }
+});
+
+export const updateProject = createAsyncThunk<
+  Project,
+  UpdateProjectPayload,
+  { rejectValue: string }
+>("project/updateProject", async (payload, { rejectWithValue }) => {
+  try {
+    const response = await API.patch(
+      `/project?projectId=${payload.projectId}&deploymentId=${payload.deploymentId}`,
+      { newSubDomain: payload.newSubDomain }
+    );
+    return response.data.project as Project;
   } catch (error) {
     const errorMessage = await handleApiError(error);
     return rejectWithValue(errorMessage);

@@ -6,6 +6,7 @@ import {
   deleteProject,
   GetProjectsResponse,
   DeleteProjectResponse,
+  updateProject,
 } from "@/redux/api/projectApi";
 
 interface ProjectState {
@@ -38,8 +39,21 @@ const projectSlice = createSlice({
       }
     );
     builder.addCase(
+      updateProject.fulfilled,
+      (state, action: PayloadAction<Project>) => {
+        if (state.projects) {
+          state.projects = state.projects.map((project) =>
+            project.id === action.payload.id ? action.payload : project
+          );
+        }
+      }
+    );
+    builder.addCase(
       deleteProject.fulfilled,
-      (state, action: PayloadAction<DeleteProjectResponse, string, { arg: string }>) => {
+      (
+        state,
+        action: PayloadAction<DeleteProjectResponse, string, { arg: string }>
+      ) => {
         if (action.payload.status === 200 && state.projects) {
           const projectId = action.meta.arg;
           state.projects = state.projects.filter(

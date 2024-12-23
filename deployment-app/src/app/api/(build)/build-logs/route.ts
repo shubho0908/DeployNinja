@@ -42,12 +42,14 @@ export async function GET(req: NextRequest) {
       /error/i.test(log.log)
     );
 
+    // TODO: use /api functions
     if (hasUploadComplete) {
       await API.patch(`/deploy?deploymentId=${deploymentId}`, {
         deploymentStatus: "READY",
       });
     }
 
+      // TODO: use /api functions
     if (hasError) {
       await API.patch(`/deploy?deploymentId=${deploymentId}`, {
         deploymentStatus: "FAILED",

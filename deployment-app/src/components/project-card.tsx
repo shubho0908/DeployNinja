@@ -11,7 +11,7 @@ import { handleApiError } from "@/redux/api/util";
 import { useAppDispatch } from "@/redux/hooks";
 import { deleteProject } from "@/redux/api/projectApi";
 import { toast } from "sonner";
-import { useEffect, useMemo, useState } from "react";
+import { useState } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
   AlertDialog,
@@ -24,7 +24,6 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
-import { late } from "zod";
 
 interface ProjectCardProps {
   project: Project;
@@ -99,7 +98,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
     <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
       <Card
         onClick={handleCardClick}
-        className="bg-card border border-border hover:border-border/80 transition-colors cursor-pointer"
+        className="bg-card border border-border hover:border-border/80 transition-colors cursor-pointer shadow"
       >
         <CardHeader className="space-y-0 p-4 flex justify-between">
           <CardTitle className="text-sm font-normal">

@@ -188,7 +188,6 @@ export async function POST(req: NextRequest) {
         : environmentVariables;
 
     const parsedData = DeploymentModel.safeParse({
-      id: "",
       projectId,
       gitBranchName,
       gitCommitHash,

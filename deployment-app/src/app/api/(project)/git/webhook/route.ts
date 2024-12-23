@@ -3,6 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchGitLatestCommit } from "@/utils/github";
 import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
+import axios from "axios";
 
 // Verify GitHub webhook signature
 function verifyGitHubWebhook(req: NextRequest, payload: string): boolean {

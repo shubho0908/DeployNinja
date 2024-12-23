@@ -7,6 +7,7 @@ import { useSelector } from "react-redux";
 import { useMemo } from "react";
 import Link from "next/link";
 import { Button } from "../ui/button";
+import { formatTimeAgo } from "@/utils/formatDate";
 
 function AllDeployments() {
   const searchParams = useSearchParams();
@@ -14,11 +15,13 @@ function AllDeployments() {
   const { projects } = useSelector((state: RootState) => state.projects);
   const { user } = useSelector((state: RootState) => state.user);
 
+  // Memoize specific project
   const project = useMemo(
     () => projects?.find((p) => p.id === projectId),
     [projects, projectId]
   );
 
+  // Memoize sorted deployments
   const sortedDeployments = useMemo(() => {
     return projects
       ?.flatMap((p) => p.deployments)
@@ -29,16 +32,6 @@ function AllDeployments() {
           new Date(a?.createdAt || 0).getTime()
       );
   }, [projects, project?.id]);
-
-  const formatTimeAgo = (date: Date) => {
-    const diff = Date.now() - date.getTime();
-    const hours = Math.floor(diff / 3600000);
-    const minutes = Math.floor((diff % 3600000) / 60000);
-
-    if (hours > 24) return `${Math.floor(hours / 24)}d ago`;
-    if (hours > 0) return `${hours}h ago`;
-    return `${minutes}m ago`;
-  };
 
   const renderDeploymentStatus = (status: string) => (
     <span className="flex items-center gap-1">

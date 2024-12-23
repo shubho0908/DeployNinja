@@ -1,7 +1,7 @@
 "use client";
 
 import { use } from "react";
-import DeploymentDetails from "@/components/pages/DeploymentDetails";
+import DeploymentDetails from "@/components/pages/deployment-details/DeploymentDetails";
 import withAuthRequired from "@/utils/withAuthRequired";
 
 function ProjectDeploymentWrapper({ params }: { params: Promise<{ id: string }> }) {

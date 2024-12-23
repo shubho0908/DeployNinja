@@ -42,7 +42,7 @@ export default function RootLayout({
               disableTransitionOnChange
             >
               <Navbar />
-              <section>{children}</section>
+             {children}
             </ThemeProvider>
           </SessionWrapper>
         </body>

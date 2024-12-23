@@ -135,9 +135,6 @@ export default function Home() {
                   <ArrowRight className="ml-2 group-hover:translate-x-1 transition-transform" />
                 </Link>
               </Button>
-              <Button variant="outline" size="lg">
-                View Demo
-              </Button>
             </div>
           </motion.div>
 

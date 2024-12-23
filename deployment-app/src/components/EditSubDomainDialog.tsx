@@ -15,6 +15,8 @@ import { Label } from "@/components/ui/label";
 import { Pencil, Loader2 } from "lucide-react";
 import { API, handleApiError } from "@/redux/api/util";
 import { toast } from "sonner";
+import { useAppDispatch } from "@/redux/hooks";
+import { updateProject } from "@/redux/api/projectApi";
 
 interface EditSubdomainDialogProps {
   projectId: string;
@@ -33,22 +35,38 @@ const EditSubdomainDialog = ({
   const [subdomain, setSubdomain] = useState(currentSubdomain);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState("");
+  const dispatch = useAppDispatch();
 
   const handleSubmit = async () => {
     setIsLoading(true);
     setError("");
 
     try {
-      await API.patch(`/project?projectId=${projectId}&deploymentId=${deploymentId}`, {
-        newSubDomain: subdomain,
-      });
+      const resultAction = await dispatch(
+        updateProject({
+          projectId,
+          deploymentId,
+          newSubDomain: subdomain,
+        })
+      );
 
-      onSuccess();
-      setOpen(false);
-      toast.success("Subdomain updated successfully");
-    } catch (err: any) {
-      setError(err?.response?.data?.message || "Failed to update subdomain");
-      throw new Error(await handleApiError(err));
+      // Check if the action was fulfilled or rejected
+      if (updateProject.fulfilled.match(resultAction)) {
+        toast.success("Subdomain updated successfully");
+        onSuccess();
+        setOpen(false);
+      } else if (updateProject.rejected.match(resultAction)) {
+        // Handle the rejected state
+        const error = resultAction.payload || "Failed to update subdomain";
+        setError(error);
+        toast.error(error);
+      }
+    } catch (err) {
+      // This catch block handles any unexpected errors
+      const errorMessage =
+        err instanceof Error ? err.message : "An unexpected error occurred";
+      setError(errorMessage);
+      toast.error(errorMessage);
     } finally {
       setIsLoading(false);
     }
