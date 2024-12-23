@@ -9,6 +9,7 @@ import {
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Accordion } from "@/components/ui/accordion";
+import { Skeleton } from "@/components/ui/skeleton";
 import { BuildLogsSection } from "./BuildLogs";
 import { CustomDomainsSection } from "./CustomDomain";
 import { getProjects } from "@/redux/api/projectApi";
@@ -44,12 +45,15 @@ const HeaderButton = ({ href, children }: HeaderButtonProps) => (
 interface DetailItemProps {
   label: string;
   value: React.ReactNode;
+  isLoading?: boolean;
 }
 
-const DetailItem = ({ label, value }: DetailItemProps) => (
+const DetailItem = ({ label, value, isLoading }: DetailItemProps) => (
   <div>
     <h4 className="text-zinc-500 dark:text-zinc-400 text-sm mb-1">{label}</h4>
-    {value}
+    {isLoading ? (
+      <Skeleton className="h-6 w-48" />
+    ) : value}
   </div>
 );
 
@@ -69,7 +73,7 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white p-8">
-      <div className="max-w-6xl relative top-16 mx-auto space-y-6">
+      <div className="max-w-6xl relative top-16 pb-8 mx-auto space-y-6">
         <Link href="/projects">
           <Button variant="secondary" size="sm">
             <ChevronLeft />
@@ -78,7 +82,11 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
         </Link>
         
         <div className="flex justify-between items-center">
-          <h1 className="text-3xl font-semibold">{project?.name}</h1>
+          <h1 className="text-3xl font-semibold">
+            {isLoading ? (
+              <Skeleton className="h-9 w-64" />
+            ) : project?.name}
+          </h1>
         </div>
 
         <div className="space-y-4">
@@ -103,24 +111,29 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
           <div className="border border-zinc-200 dark:border-zinc-800 rounded-lg p-6">
             <div className="grid grid-cols-2 gap-8">
               <div className="bg-zinc-50 dark:bg-zinc-900 rounded-md p-8">
-                {project?.subDomain && (
+                {isLoading ? (
+                  <Skeleton className="w-full h-64 rounded" />
+                ) : project?.subDomain ? (
                   <div className="w-full h-64 rounded flex items-center justify-center">
                     <p className="italic">Preview isn't available yet</p>
                   </div>
-                )}
+                ) : null}
               </div>
 
               <div className="space-y-6">
                 <DetailItem 
                   label="Deployment ID" 
-                  value={latestDeployment?.id || "N/A"} 
+                  value={latestDeployment?.id}
+                  isLoading={isLoading}
                 />
                 
                 <div>
                   <h4 className="text-zinc-500 dark:text-zinc-400 text-sm mb-1">
                     Domains
                   </h4>
-                  {project?.subDomain && (
+                  {isLoading ? (
+                    <Skeleton className="h-6 w-64" />
+                  ) : project?.subDomain ? (
                     <Link
                       href={`http://${project.subDomain}.localhost:8000`}
                       target="_blank"
@@ -128,14 +141,19 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
                     >
                       {project.subDomain}.localhost:8000
                     </Link>
-                  )}
+                  ) : null}
                 </div>
 
                 <div>
                   <h4 className="text-zinc-500 dark:text-zinc-400 text-sm mb-1">
                     Status
                   </h4>
-                  {latestDeployment && (
+                  {isLoading ? (
+                    <div className="space-y-2">
+                      <Skeleton className="h-6 w-24" />
+                      <Skeleton className="h-4 w-48" />
+                    </div>
+                  ) : latestDeployment && (
                     <>
                       <StatusIndicator status={latestDeployment.deploymentStatus} />
                       <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
@@ -155,6 +173,7 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
                       </p>
                     </>
                   }
+                  isLoading={isLoading}
                 />
               </div>
             </div>

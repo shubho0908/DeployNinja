@@ -1,19 +1,31 @@
 import { motion } from "framer-motion";
 import Link from "next/link";
 import {
-  Plus, X, Terminal, Key, Box, GitBranch, 
-  Rocket, ArrowLeft, Loader2
+  Plus,
+  X,
+  Terminal,
+  Key,
+  Box,
+  GitBranch,
+  Rocket,
+  ArrowLeft,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Input } from "@/components/ui/input";
 import {
-  Select, SelectTrigger, SelectValue,
-  SelectContent, SelectItem
+  Select,
+  SelectTrigger,
+  SelectValue,
+  SelectContent,
+  SelectItem,
 } from "@/components/ui/select";
 import {
-  Accordion, AccordionContent,
-  AccordionItem, AccordionTrigger,
+  Accordion,
+  AccordionContent,
+  AccordionItem,
+  AccordionTrigger,
 } from "@/components/ui/accordion";
 import { frameworks, container, item } from "@/utils/constants";
 import { useCreateProject } from "./CreateProject";
@@ -22,25 +34,31 @@ export default function CreateProjectCard() {
   const { state, updateState, handleSubmit } = useCreateProject();
 
   const addEnvVar = () => {
-    updateState({ 
-      envVars: [...state.envVars, { key: "", value: "" }] 
+    updateState({
+      envVars: [...state.envVars, { key: "", value: "" }],
     });
   };
 
   const removeEnvVar = (index: number) => {
     updateState({
-      envVars: state.envVars.filter((_, i) => i !== index)
+      envVars: state.envVars.filter((_, i) => i !== index),
     });
   };
 
-  const updateEnvVar = (index: number, field: 'key' | 'value', value: string) => {
+  const updateEnvVar = (
+    index: number,
+    field: "key" | "value",
+    value: string
+  ) => {
     const newEnvVars = [...state.envVars];
     newEnvVars[index][field] = value;
     updateState({ envVars: newEnvVars });
   };
 
   const handleRepoSelect = (value: string) => {
-    const repo = state.repositories.find(repo => repo.id.toString() === value);
+    const repo = state.repositories.find(
+      (repo) => repo.id.toString() === value
+    );
     updateState({ selectedRepo: repo || null });
   };
 
@@ -61,32 +79,43 @@ export default function CreateProjectCard() {
               </div>
               <div>
                 <h1 className="text-3xl font-bold">Create New Project</h1>
-                <p className="text-muted-foreground">Deploy your next big idea in minutes</p>
+                <p className="text-muted-foreground">
+                  Deploy your next big idea in minutes
+                </p>
               </div>
             </div>
             <Button variant="ghost" size="sm" asChild>
               <Link href="/projects" className="flex items-center gap-2">
-                <ArrowLeft className="h-4 w-4" />Back to Projects
+                <ArrowLeft className="h-4 w-4" />
+                Back to Projects
               </Link>
             </Button>
           </div>
 
           {/* Main Form */}
-          <motion.div variants={container} initial="hidden" animate="show" 
-            className="space-y-8 bg-card p-6 rounded-lg border shadow-sm">
-            
+          <motion.div
+            variants={container}
+            initial="hidden"
+            animate="show"
+            className="space-y-8 bg-card p-6 rounded-lg border shadow-sm"
+          >
             {/* Repository Selection */}
             <motion.div variants={item} className="space-y-4">
               <Label htmlFor="repo-select" className="flex items-center gap-2">
-                <Box className="h-4 w-4" />Select Repository
+                <Box className="h-4 w-4" />
+                Select Repository
               </Label>
 
               {state.error && (
-                <div className="text-sm text-destructive mb-2">Error: {state.error}</div>
+                <div className="text-sm text-destructive mb-2">
+                  Error: {state.error}
+                </div>
               )}
 
               {state.isLoading ? (
-                <div className="text-sm text-muted-foreground">Loading repositories...</div>
+                <div className="text-sm text-muted-foreground">
+                  Loading repositories...
+                </div>
               ) : (
                 <Select onValueChange={handleRepoSelect}>
                   <SelectTrigger className="w-full">
@@ -108,16 +137,23 @@ export default function CreateProjectCard() {
               <motion.div variants={item} className="space-y-4">
                 {/* Framework Selection */}
                 <Label className="flex items-center gap-2">
-                  <GitBranch className="h-4 w-4" />Framework
+                  <GitBranch className="h-4 w-4" />
+                  Framework
                 </Label>
                 <div className="grid grid-cols-2 gap-4">
                   {frameworks.map((framework) => (
                     <Button
                       key={framework.id}
                       type="button"
-                      variant={state.selectedFramework === framework.name ? "default" : "outline"}
+                      variant={
+                        state.selectedFramework === framework.name
+                          ? "default"
+                          : "outline"
+                      }
                       className="h-auto py-4 flex flex-col items-center gap-2"
-                      onClick={() => updateState({ selectedFramework: framework.name })}
+                      onClick={() =>
+                        updateState({ selectedFramework: framework.name })
+                      }
                     >
                       <span className="text-2xl">{framework.icon}</span>
                       <span>{framework.name}</span>
@@ -130,18 +166,23 @@ export default function CreateProjectCard() {
                   <AccordionItem value="build-commands">
                     <AccordionTrigger className="hover:no-underline group">
                       <span className="flex items-center gap-2 group-hover:text-primary transition-colors">
-                        <Terminal className="h-4 w-4" />Build Commands
+                        <Terminal className="h-4 w-4" />
+                        Build Commands
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
                       <div className="space-y-4 pt-4">
                         <div>
-                          <Label htmlFor="install-command">Install Command</Label>
+                          <Label htmlFor="install-command">
+                            Install Command
+                          </Label>
                           <Input
                             id="install-command"
                             placeholder="npm install"
                             value={state.installCommand}
-                            onChange={e => updateState({ installCommand: e.target.value })}
+                            onChange={(e) =>
+                              updateState({ installCommand: e.target.value })
+                            }
                             className="font-mono text-sm"
                           />
                         </div>
@@ -151,7 +192,9 @@ export default function CreateProjectCard() {
                             id="build-command"
                             placeholder="npm run build"
                             value={state.buildCommand}
-                            onChange={e => updateState({ buildCommand: e.target.value })}
+                            onChange={(e) =>
+                              updateState({ buildCommand: e.target.value })
+                            }
                             className="font-mono text-sm"
                           />
                         </div>
@@ -161,7 +204,9 @@ export default function CreateProjectCard() {
                             id="rootDir"
                             placeholder="./"
                             value={state.projectRootDir}
-                            onChange={e => updateState({ projectRootDir: e.target.value })}
+                            onChange={(e) =>
+                              updateState({ projectRootDir: e.target.value })
+                            }
                             className="font-mono text-sm"
                           />
                         </div>
@@ -173,7 +218,8 @@ export default function CreateProjectCard() {
                   <AccordionItem value="env-vars">
                     <AccordionTrigger className="hover:no-underline group">
                       <span className="flex items-center gap-2 group-hover:text-primary transition-colors">
-                        <Key className="h-4 w-4" />Environment Variables
+                        <Key className="h-4 w-4" />
+                        Environment Variables
                       </span>
                     </AccordionTrigger>
                     <AccordionContent>
@@ -188,13 +234,17 @@ export default function CreateProjectCard() {
                             <Input
                               placeholder="KEY"
                               value={envVar.key}
-                              onChange={e => updateEnvVar(index, 'key', e.target.value)}
+                              onChange={(e) =>
+                                updateEnvVar(index, "key", e.target.value)
+                              }
                               className="font-mono text-sm"
                             />
                             <Input
                               placeholder="VALUE"
                               value={envVar.value}
-                              onChange={e => updateEnvVar(index, 'value', e.target.value)}
+                              onChange={(e) =>
+                                updateEnvVar(index, "value", e.target.value)
+                              }
                               className="font-mono text-sm"
                             />
                             <Button
@@ -224,11 +274,13 @@ export default function CreateProjectCard() {
                 {/* Submit Button */}
                 {state.isSubmitting ? (
                   <Button disabled className="w-full" size="lg">
-                    <Loader2 className="animate-spin mr-2 h-4 w-4" />Please wait
+                    <Loader2 className="animate-spin mr-2 h-4 w-4" />
+                    Please wait
                   </Button>
                 ) : (
                   <Button className="w-full" size="lg" onClick={handleSubmit}>
-                    <Rocket className="mr-2 h-4 w-4" />Create Project
+                    <Rocket className="mr-2 h-4 w-4" />
+                    Create Project
                   </Button>
                 )}
               </motion.div>

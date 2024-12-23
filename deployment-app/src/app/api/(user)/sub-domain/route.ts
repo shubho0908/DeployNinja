@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { handleApiError } from "@/redux/api/util";
 import { NextRequest, NextResponse } from "next/server";
 
 export async function PATCH(req: NextRequest) {
@@ -7,10 +8,7 @@ export async function PATCH(req: NextRequest) {
     const subDomain = req.nextUrl.searchParams.get("subDomain");
 
     if (!projectId || !subDomain) {
-      return NextResponse.json({
-        status: 400,
-        message: "projectId and subDomain are required",
-      });
+      throw new Error("projectId and subDomain are required");
     }
 
     const project = await prisma.project.update({
@@ -20,11 +18,12 @@ export async function PATCH(req: NextRequest) {
       },
     });
 
-    return NextResponse.json({ status: 200, project: project, message: "Subdomain updated successfully" });
-  } catch (error) {
     return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
+      status: 200,
+      project: project,
+      message: "Subdomain updated successfully",
     });
+  } catch (error) {
+    throw new Error(await handleApiError(error));
   }
 }

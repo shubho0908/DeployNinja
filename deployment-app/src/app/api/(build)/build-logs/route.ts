@@ -3,12 +3,13 @@ import { createClient } from "@clickhouse/client";
 import { API, handleApiError } from "@/redux/api/util";
 import { z } from "zod";
 
-// Clickhouse client
-export const client = createClient({
+// Initialize Clickhouse client
+const client = createClient({
   database: process.env.CLICKHOUSE_DB!,
   url: process.env.CLICKHOUSE_HOST!,
 });
 
+// Schema for build logs
 const BuildLogsSchema = z.object({
   event_id: z.string(),
   deployment_id: z.string(),
@@ -18,52 +19,53 @@ const BuildLogsSchema = z.object({
 
 type BuildLogs = z.infer<typeof BuildLogsSchema>;
 
-// GET route to get all build logs of a deployment
+// Fetch and process build logs
 export async function GET(req: NextRequest) {
+  const deploymentId = req.nextUrl.searchParams.get("deploymentId");
+
+  if (!deploymentId) {
+    throw new Error(await handleApiError("Deployment ID is required"));
+  }
+
   try {
-    const deploymentId = req.nextUrl.searchParams.get("deploymentId");
-    if (!deploymentId) {
-      throw new Error(await handleApiError("Deployment ID is required"));
-    }
+    const rawLogs = await fetchLogs(deploymentId);
 
-    const logs = await client.query({
-      query:
-        "SELECT event_id, deployment_id, log, timestamp from log_events WHERE deployment_id = {deployment_id:String}",
-      query_params: { deployment_id: deploymentId },
-      format: "JSONEachRow",
-    });
-
-    const rawLogs = (await logs.json()) as BuildLogs[];
-
-    const hasUploadComplete = rawLogs.some((log: BuildLogs) =>
-      log.log.includes("Upload complete...")
-    );
-    const hasError = rawLogs.some((log: BuildLogs) =>
-      /error/i.test(log.log)
-    );
-
-    // TODO: use /api functions
-    if (hasUploadComplete) {
-      await API.patch(`/deploy?deploymentId=${deploymentId}`, {
-        deploymentStatus: "READY",
-      });
-    }
-
-      // TODO: use /api functions
-    if (hasError) {
-      await API.patch(`/deploy?deploymentId=${deploymentId}`, {
-        deploymentStatus: "FAILED",
-      });
-    }
+    await updateDeploymentStatus(deploymentId, rawLogs);
 
     return NextResponse.json({ status: 200, logs: rawLogs });
   } catch (error) {
     console.error("Failed to fetch build logs:", error);
-
-    return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
-    });
+    throw new Error(await handleApiError(error));
   }
 }
 
+// Fetch logs from the database
+async function fetchLogs(deploymentId: string): Promise<BuildLogs[]> {
+  const logs = await client.query({
+    query:
+      "SELECT event_id, deployment_id, log, timestamp FROM log_events WHERE deployment_id = {deployment_id:String}",
+    query_params: { deployment_id: deploymentId },
+    format: "JSONEachRow",
+  });
+  return logs.json();
+}
+
+// Update deployment status based on logs
+async function updateDeploymentStatus(deploymentId: string, logs: BuildLogs[]) {
+  const hasUploadComplete = logs.some((log) =>
+    log.log.includes("Upload complete...")
+  );
+  const hasError = logs.some((log) => /error/i.test(log.log));
+
+  if (hasUploadComplete) {
+    await API.patch(`/deploy?deploymentId=${deploymentId}`, {
+      deploymentStatus: "READY",
+    });
+  }
+
+  if (hasError) {
+    await API.patch(`/deploy?deploymentId=${deploymentId}`, {
+      deploymentStatus: "FAILED",
+    });
+  }
+}

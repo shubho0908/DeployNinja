@@ -4,16 +4,44 @@ import { useSearchParams } from "next/navigation";
 import { ChevronLeft, GitBranch } from "lucide-react";
 import { RootState } from "@/app/store";
 import { useSelector } from "react-redux";
-import { useMemo } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Button } from "../ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { formatTimeAgo } from "@/utils/formatDate";
 
-function AllDeployments() {
+function DeploymentSkeleton() {
+  return (
+    <div className="flex items-center justify-between p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800">
+      <div className="flex-1">
+        <div className="flex items-center gap-4">
+          <Skeleton className="h-4 w-16" /> {/* Deployment ID */}
+          <Skeleton className="h-4 w-24" /> {/* Status */}
+          <Skeleton className="h-4 w-32" /> {/* Time ago */}
+        </div>
+        <div className="mt-2 flex items-center gap-4">
+          <Skeleton className="h-5 w-16" /> {/* Current tag */}
+          <div className="flex items-center gap-2">
+            <Skeleton className="h-4 w-4" /> {/* Git icon */}
+            <Skeleton className="h-4 w-24" /> {/* Branch name */}
+            <Skeleton className="h-4 w-16" /> {/* Commit hash */}
+          </div>
+        </div>
+      </div>
+      <div className="flex items-center gap-2">
+        <Skeleton className="w-6 h-6 rounded-full" /> {/* User image */}
+        <Skeleton className="h-4 w-48" /> {/* User info */}
+      </div>
+    </div>
+  );
+}
+
+export default function AllDeployments() {
   const searchParams = useSearchParams();
   const projectId = searchParams.get("id");
   const { projects } = useSelector((state: RootState) => state.projects);
   const { user } = useSelector((state: RootState) => state.user);
+  const [loading, setLoading] = useState(true);
 
   // Memoize specific project
   const project = useMemo(
@@ -32,6 +60,13 @@ function AllDeployments() {
           new Date(a?.createdAt || 0).getTime()
       );
   }, [projects, project?.id]);
+
+  // Loading state
+  useEffect(() => {
+    if (projects || sortedDeployments) {
+      setLoading(false);
+    }
+  }, [projects, sortedDeployments]);
 
   const renderDeploymentStatus = (status: string) => (
     <span className="flex items-center gap-1">
@@ -78,49 +113,63 @@ function AllDeployments() {
             All Projects
           </Button>
         </Link>
-        <h1 className="text-3xl font-semibold mb-8">
-          Deployments of {project?.name && `— ${project.name}`}
-        </h1>
+
+        {loading ? (
+          <div className="space-y-2">
+            <Skeleton className="h-12 w-64" /> {/* Project name skeleton */}
+          </div>
+        ) : (
+          <h1 className="text-3xl font-semibold mb-8">
+            Deployments of {project?.name && `— ${project.name}`}
+          </h1>
+        )}
 
         <div className="space-y-4">
-          {sortedDeployments?.map((deployment, index) => (
-            <div
-              key={deployment?.id}
-              className="flex items-center justify-between p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
-            >
-              <div className="flex-1">
-                <div className="flex items-center gap-4">
-                  <Link
-                    href={`/deployments/${deployment?.id}`}
-                    className="text-sm font-mono text-blue-600 dark:text-blue-400 hover:underline"
-                  >
-                    {deployment?.id?.slice(0, 7)}
-                  </Link>
-                  {renderDeploymentStatus(deployment?.deploymentStatus!)}
+          {loading ? (
+            // Show 3 skeleton items while loading
+            <>
+              <DeploymentSkeleton />
+              <DeploymentSkeleton />
+              <DeploymentSkeleton />
+            </>
+          ) : (
+            sortedDeployments?.map((deployment, index) => (
+              <div
+                key={deployment?.id}
+                className="flex items-center justify-between p-4 rounded-lg bg-zinc-50 dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800"
+              >
+                <div className="flex-1">
+                  <div className="flex items-center gap-4">
+                    <Link
+                      href={`/deployments/${deployment?.id}`}
+                      className="text-sm font-mono text-blue-600 dark:text-blue-400 hover:underline"
+                    >
+                      {deployment?.id?.slice(0, 7)}
+                    </Link>
+                    {renderDeploymentStatus(deployment?.deploymentStatus!)}
+                    <span className="text-sm text-zinc-500 dark:text-zinc-400">
+                      {formatTimeAgo(new Date(deployment?.createdAt!))}
+                    </span>
+                  </div>
+                  {renderDeploymentMeta(deployment, index === 0)}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <img
+                    src={user?.profileImage ?? ""}
+                    alt={user?.name ?? "User"}
+                    className="w-6 h-6 rounded-full"
+                  />
                   <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                    {formatTimeAgo(new Date(deployment?.createdAt!))}
+                    {formatTimeAgo(new Date(deployment?.createdAt!))} by{" "}
+                    {user?.username}
                   </span>
                 </div>
-                {renderDeploymentMeta(deployment, index === 0)}
               </div>
-
-              <div className="flex items-center gap-2">
-                <img
-                  src={user?.profileImage ?? ""}
-                  alt={user?.name ?? "User"}
-                  className="w-6 h-6 rounded-full"
-                />
-                <span className="text-sm text-zinc-500 dark:text-zinc-400">
-                  {formatTimeAgo(new Date(deployment?.createdAt!))} by{" "}
-                  {user?.username}
-                </span>
-              </div>
-            </div>
-          ))}
+            ))
+          )}
         </div>
       </div>
     </div>
   );
 }
-
-export default AllDeployments;

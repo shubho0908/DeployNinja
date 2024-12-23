@@ -4,6 +4,7 @@ import { prisma } from "@/lib/prisma";
 import { fetchGitLatestCommit } from "@/utils/github";
 import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
 import axios from "axios";
+import { handleApiError } from "@/redux/api/util";
 
 // Verify GitHub webhook signature
 function verifyGitHubWebhook(req: NextRequest, payload: string): boolean {
@@ -43,12 +44,12 @@ export async function POST(req: NextRequest) {
     const accessToken = projectData?.owner?.githubAccessToken;
 
     if (!accessToken) {
-      return NextResponse.json({ status: 401, message: "Unauthorized" });
+      throw new Error(await handleApiError("Unauthorized"));
     }
 
     // Verify webhook signature
     if (!verifyGitHubWebhook(req, payload)) {
-      return NextResponse.json({ status: 403, message: "Unauthorized" });
+      throw new Error(await handleApiError("Unauthorized"));
     }
     const body = JSON.parse(payload);
 
@@ -75,10 +76,7 @@ export async function POST(req: NextRequest) {
 
     if (!project) {
       console.log("No project found for the push event");
-      return NextResponse.json({
-        status: 200,
-        message: "No matching project found for the push event",
-      });
+      throw new Error(await handleApiError("No matching project found"));
     }
 
     console.log("Preparing deployment payload...");
@@ -131,10 +129,6 @@ export async function POST(req: NextRequest) {
     });
   } catch (error) {
     console.log("Webhook processing error:", error);
-    return NextResponse.json({
-      status: 500,
-      message: "Internal server error",
-      error: error instanceof Error ? error.message : "Unknown error",
-    });
+    throw new Error(await handleApiError(error));
   }
 }

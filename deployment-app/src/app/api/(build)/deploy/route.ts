@@ -1,20 +1,11 @@
 import { prisma } from "@/lib/prisma";
 import { DeploymentModel } from "@/types/schemas/Deployment";
 import { fetchGitLatestCommit } from "@/utils/github";
-import { ECSClient, RunTaskCommand } from "@aws-sdk/client-ecs";
 import { DeploymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
 import { Octokit } from "@octokit/rest";
 import { exec } from "child_process";
 import { handleApiError } from "@/redux/api/util";
-
-const ecsClient = new ECSClient({
-  region: process.env.AWS_REGION!,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID!,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY!,
-  },
-});
 
 // Function to create a Github webhook for a given repository
 async function createGitHubWebhook(
@@ -76,21 +67,8 @@ async function createGitHubWebhook(
 
       console.log("Webhook created successfully. ", webhook.data.id);
     }
-  } catch (error: unknown) {
-    // Type guard to check if error is an object with status property
-    if (
-      error instanceof Error &&
-      "status" in error &&
-      (error as { status: number }).status === 404
-    ) {
-      // Fallback for any unexpected errors
-      console.error("Unexpected error creating webhook:", error);
-      throw error;
-    } else {
-      // Handle other types of errors
-      console.error("Failed to create GitHub webhook:", error);
-      throw error;
-    }
+  } catch (error) {
+    throw new Error(await handleApiError(error));
   }
 }
 
@@ -122,8 +100,7 @@ async function runDockerDeploymentWithCLI(
 
     console.log("Docker container started successfully.");
   } catch (error) {
-    console.error("Docker CLI deployment failed:", error);
-    throw error;
+    throw new Error(await handleApiError(error));
   }
 }
 
@@ -133,10 +110,7 @@ export async function GET(req: NextRequest) {
     const projectId = searchParams.get("projectId");
 
     if (!projectId) {
-      return NextResponse.json({
-        status: 400,
-        message: "projectId is required",
-      });
+      throw new Error(await handleApiError("projectId is required"));
     }
 
     const deployments = await prisma.deployment.findMany({
@@ -145,25 +119,19 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ status: 200, data: deployments });
   } catch (error) {
-    return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
-    });
+    throw new Error(await handleApiError(error));
   }
 }
 
 // POST route to start a deployment
 export async function POST(req: NextRequest) {
   try {
-    console.log("POST request received");
-
+    console.log("⚡️ POST request received ⚡");
     // Extract the access token from the Authorization header
     const authHeader = req.headers.get("Authorization");
-    const requestMaker = req.headers.get("X-Request-Maker");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      return NextResponse.json(
-        { error: "Authorization token missing or invalid" },
-        { status: 401 }
+      throw new Error(
+        await handleApiError("Authorization token missing or invalid")
       );
     }
 
@@ -174,13 +142,8 @@ export async function POST(req: NextRequest) {
       gitBranchName,
       gitCommitHash,
       deploymentStatus,
-      // buildCommand,
-      // installCommand,
-      // projectRootDir,
       environmentVariables,
     } = await req.json();
-
-    console.log("Yaha tk sb theek");
 
     const envVarsObject =
       typeof environmentVariables === "string"
@@ -197,12 +160,7 @@ export async function POST(req: NextRequest) {
 
     if (!parsedData.success) {
       console.log("Error ", parsedData.error);
-
-      return NextResponse.json({
-        status: 400,
-        message: "Invalid request",
-        data: parsedData.error,
-      });
+      throw new Error(await handleApiError("Invalid request"));
     }
 
     const project = await prisma.project.findUnique({
@@ -210,7 +168,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!project) {
-      return NextResponse.json({ status: 404, message: "Project not found" });
+      throw new Error(await handleApiError("Project not found"));
     }
 
     // TODO: add if request maker is webhook
@@ -226,11 +184,7 @@ export async function POST(req: NextRequest) {
         accessToken
       );
     } catch (error) {
-      return NextResponse.json({
-        status: 500,
-        message:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      });
+      throw new Error(await handleApiError(error));
     }
 
     const gitInfo = await fetchGitLatestCommit({
@@ -238,60 +192,6 @@ export async function POST(req: NextRequest) {
       repoUrl: project.gitRepoUrl,
       branch: gitBranchName,
     });
-
-    // Deployment logic remains unchanged
-    // const command = new RunTaskCommand({
-    //   cluster: process.env.CLUSTER!,
-    //   taskDefinition: process.env.TASK!,
-    //   launchType: "FARGATE",
-    //   count: 1,
-    //   networkConfiguration: {
-    //     awsvpcConfiguration: {
-    //       subnets: process.env.SUBNETS!.split(","),
-    //       securityGroups: process.env.SECURITY_GROUPS!.split(","),
-    //       assignPublicIp: "ENABLED",
-    //     },
-    //   },
-    //   overrides: {
-    //     containerOverrides: [
-    //       {
-    //         name: process.env.AWS_ECR_IMAGE,
-    //         environment: [
-    //           { name: "PROJECT_ID", value: projectId },
-    //           { name: "GITHUB_REPO_URL", value: gitRepoUrl },
-    //           {
-    //             name: "PROJECT_INSTALL_COMMAND",
-    //             value: installCommand ?? "npm install",
-    //           },
-    //           {
-    //             name: "PROJECT_BUILD_COMMAND",
-    //             value: buildCommand ?? "npm run build",
-    //           },
-    //           {
-    //             name: "PROJECT_ROOT_DIR",
-    //             value: projectRootDir ?? "./",
-    //           },
-    //           ...Object.entries(environmentVariables ?? {}).map(
-    //             ([key, value]) => ({
-    //               name: `PROJECT_ENVIRONMENT_${key}`,
-    //               value,
-    //             })
-    //           ),
-    //         ],
-    //       },
-    //     ],
-    //   },
-    // });
-
-    // try {
-    // const response = await ecsClient.send(command);
-
-    // if (!response.tasks || response.tasks.length === 0) {
-    //   return NextResponse.json({
-    //     status: 500,
-    //     message: "Failed to start deployment task",
-    //   });
-    // }
 
     try {
       // Create a deployment record
@@ -340,61 +240,25 @@ export async function POST(req: NextRequest) {
           environmentVariables: JSON.stringify(envVarsObject),
         },
       });
-      return NextResponse.json({
-        status: 500,
-        message: "Failed to start deployment",
-        error:
-          error instanceof Error ? error.message : "Unknown error occurred",
-      });
+      throw new Error(await handleApiError("Failed to start deployment"));
     }
-    // } catch (error) {
-    //   console.error("ECS Task deployment failed:", error);
-
-    //   // Create failed deployment record
-    //   await prisma.deployment.create({
-    //     data: {
-    //       projectId,
-    //       gitBranchName,
-    //       gitCommitHash,
-    //       deploymentStatus: DeploymentStatus.FAILED,
-    //       deploymentMessage:
-    //         error instanceof Error
-    //           ? error.message
-    //           : "Error while deploying your service, an unknown error occurred",
-    //     },
-    //   });
-
-    //   return NextResponse.json({
-    //     status: 500,
-    //     message: "Failed to start deployment",
-    //     error:
-    //       error instanceof Error ? error.message : "Unknown error occurred",
-    //   });
-    // }
   } catch (error) {
     throw new Error(await handleApiError(error));
   }
 }
 
 // Update deployment status when the deployment is complete/failed
-// Call this endpoint after the deployment is complete from Build Server
 export async function PATCH(req: NextRequest) {
   try {
     const deploymentId = req.nextUrl.searchParams.get("deploymentId");
     const { deploymentStatus } = await req.json();
 
     if (!deploymentId) {
-      return NextResponse.json({
-        status: 400,
-        message: "deploymentId is required",
-      });
+      throw new Error(await handleApiError("deploymentId is required"));
     }
 
     if (!deploymentStatus) {
-      return NextResponse.json({
-        status: 400,
-        message: "deploymentStatus is required",
-      });
+      throw new Error(await handleApiError("deploymentStatus is required"));
     }
 
     const deployment = await prisma.deployment.update({
@@ -408,10 +272,7 @@ export async function PATCH(req: NextRequest) {
       status: 200,
       data: deployment,
     });
-  } catch (error) {
-    return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
-    });
+  } catch (error: unknown) {
+    throw new Error(await handleApiError(error));
   }
 }

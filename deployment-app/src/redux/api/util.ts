@@ -7,28 +7,12 @@ export const API = axios.create({
   baseURL: `${BASE_URL}/api`,
 });
 
-// // Interceptor to add authentication token
-// const authInterceptor = async (config: InternalAxiosRequestConfig) => {
-//   if (process.browser) {
-//     // Ensure it's running in the client-side environment
-//     const session = await auth();
-//     if (session) {
-//       config.headers.Authorization = `Bearer ${session.accessToken}`;
-//     }
-//   }
-//   return config;
-// };
-
-// // Add the interceptor to the API instance
-// API.interceptors.request.use(authInterceptor, (error) => Promise.reject(error));
-
 // Handle ApiError
 export const handleApiError = async (error: unknown) => {
   try {
     const errorMessage =
-      error instanceof Error ? error.message : "Unknown error occurred";
+      error instanceof Error ? error.message : String(error);
 
-    // Ensure that the return type matches the expected structure for rejectWithValue
     return errorMessage;
   } catch {
     // Fallback in case of unexpected error structures

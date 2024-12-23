@@ -37,7 +37,26 @@ const EditSubdomainDialog = ({
   const [error, setError] = useState("");
   const dispatch = useAppDispatch();
 
+  const validateSubdomain = (value: string): string | null => {
+    if (value.length > 30) {
+      return "Subdomain must not exceed 30 characters.";
+    }
+    if (!/^[a-zA-Z0-9-]+$/.test(value)) {
+      return "Subdomain can only contain letters, numbers, and hyphens.";
+    }
+    if (/^-|-$/.test(value)) {
+      return "Subdomain cannot start or end with a hyphen.";
+    }
+    return null;
+  };
+
   const handleSubmit = async () => {
+    const validationError = validateSubdomain(subdomain);
+    if (validationError) {
+      setError(validationError);
+      return;
+    }
+
     setIsLoading(true);
     setError("");
 
@@ -50,19 +69,16 @@ const EditSubdomainDialog = ({
         })
       );
 
-      // Check if the action was fulfilled or rejected
       if (updateProject.fulfilled.match(resultAction)) {
         toast.success("Subdomain updated successfully");
         onSuccess();
         setOpen(false);
       } else if (updateProject.rejected.match(resultAction)) {
-        // Handle the rejected state
         const error = resultAction.payload || "Failed to update subdomain";
         setError(error);
         toast.error(error);
       }
     } catch (err) {
-      // This catch block handles any unexpected errors
       const errorMessage =
         err instanceof Error ? err.message : "An unexpected error occurred";
       setError(errorMessage);
@@ -95,7 +111,10 @@ const EditSubdomainDialog = ({
               <Input
                 id="subdomain"
                 value={subdomain}
-                onChange={(e) => setSubdomain(e.target.value)}
+                onChange={(e) => {
+                  setSubdomain(e.target.value);
+                  setError(""); // Clear error while typing
+                }}
                 placeholder="your-subdomain"
                 className="flex-1"
               />
@@ -116,7 +135,9 @@ const EditSubdomainDialog = ({
           <Button
             type="submit"
             onClick={handleSubmit}
-            disabled={isLoading || !subdomain || subdomain === currentSubdomain}
+            disabled={
+              isLoading || !subdomain || subdomain === currentSubdomain
+            }
           >
             {isLoading && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
             Save Changes

@@ -7,11 +7,12 @@ import Link from "next/link";
 import { Project } from "@/types/schemas/Project";
 import { useRouter } from "next/navigation";
 import { Button } from "./ui/button";
+import { Skeleton } from "@/components/ui/skeleton";
 import { handleApiError } from "@/redux/api/util";
 import { useAppDispatch } from "@/redux/hooks";
 import { deleteProject } from "@/redux/api/projectApi";
 import { toast } from "sonner";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { formatDistanceToNow } from "date-fns";
 import {
   AlertDialog,
@@ -34,6 +35,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const dispatch = useAppDispatch();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [latestDeployment, setLatestDeployment] = useState<any>(null);
 
   const getProjectIcon = () => {
     switch (project.framework) {
@@ -49,6 +52,28 @@ export function ProjectCard({ project }: ProjectCardProps) {
         return "⚛️";
     }
   };
+
+  useEffect(() => {
+    const getLatestDeployment = () => {
+      if (!project.deployments || project.deployments.length === 0) return null;
+
+      const sortedDeployments = [...project.deployments].sort((a, b) => {
+        const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
+        const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
+        return dateB - dateA;
+      });
+
+      return sortedDeployments[0];
+    };
+
+    // Simulate loading delay
+    const timer = setTimeout(() => {
+      setLatestDeployment(getLatestDeployment());
+      setIsLoading(false);
+    }, 1000);
+
+    return () => clearTimeout(timer);
+  }, [project.deployments]);
 
   const handleProjectDeletion = async (e?: React.MouseEvent) => {
     e?.preventDefault();
@@ -74,23 +99,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
     setIsDialogOpen(true);
   };
 
-  const getLatestDeployment = () => {
-    if (!project.deployments || project.deployments.length === 0) return null;
-
-    const sortedDeployments = [...project.deployments].sort((a, b) => {
-      const dateA = a.updatedAt ? new Date(a.updatedAt).getTime() : 0;
-      const dateB = b.updatedAt ? new Date(b.updatedAt).getTime() : 0;
-      return dateB - dateA;
-    });
-
-    return sortedDeployments[0];
-  };
-
-  const latestDeployment = getLatestDeployment();
-
   const handleCardClick = () => {
-    if (!isDialogOpen) {
-      router.push(`/deployments/${latestDeployment?.id}`);
+    if (!isDialogOpen && latestDeployment?.id) {
+      router.push(`/deployments/${latestDeployment.id}`);
     }
   };
 
@@ -109,14 +120,18 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   <span className="text-foreground font-medium text-lg">
                     {project.name}
                   </span>
-                  <Link
-                    href={`http://${project.subDomain}.localhost:8000`}
-                    target="_blank"
-                    onClick={(e) => e.stopPropagation()}
-                    className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                  >
-                    {project.subDomain}.localhost:8000
-                  </Link>
+                  {isLoading ? (
+                    <Skeleton className="h-4 w-48 mt-1" />
+                  ) : (
+                    <Link
+                      href={`http://${project.subDomain}.localhost:8000`}
+                      target="_blank"
+                      onClick={(e) => e.stopPropagation()}
+                      className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
+                    >
+                      {project.subDomain}.localhost:8000
+                    </Link>
+                  )}
                 </div>
               </div>
               <div className="flex items-center gap-2">
@@ -182,33 +197,50 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </CardHeader>
         <CardContent className="p-4 pt-0">
           <div className="flex items-start flex-col gap-2 text-sm text-muted-foreground">
-            <Link
-              href={project.gitRepoUrl}
-              target="_blank"
-              onClick={(e) => e.stopPropagation()}
-              className="flex relative z-10 items-center gap-2 px-3 py-1 rounded-full dark:text-white text-black dark:bg-gray-800/70 bg-gray-200 hover:text-foreground transition-colors"
-            >
-              <GithubIcon className="w-4" />
-              <span>
-                {new URL(project.gitRepoUrl).pathname.split("/")[1]}/
-                {new URL(project.gitRepoUrl).pathname.split("/")[2]}
-              </span>
-            </Link>
+            {isLoading ? (
+              <Skeleton className="h-8 w-64" />
+            ) : (
+              <Link
+                href={project.gitRepoUrl}
+                target="_blank"
+                onClick={(e) => e.stopPropagation()}
+                className="flex relative z-10 items-center gap-2 px-3 py-1 rounded-full dark:text-white text-black dark:bg-gray-800/70 bg-gray-200 hover:text-foreground transition-colors"
+              >
+                <GithubIcon className="w-4" />
+                <span>
+                  {new URL(project.gitRepoUrl).pathname.split("/")[1]}/
+                  {new URL(project.gitRepoUrl).pathname.split("/")[2]}
+                </span>
+              </Link>
+            )}
           </div>
-          <p className="text-sm text-muted-foreground mt-3 ml-1">
-            Created{" "}
-            {project?.createdAt &&
-              formatDistanceToNow(new Date(project.createdAt))}{" "}
-            ago
-          </p>
-          <div className="flex items-end gap-2">
+          {isLoading ? (
+            <Skeleton className="h-4 w-40 mt-3 ml-1" />
+          ) : (
             <p className="text-sm text-muted-foreground mt-3 ml-1">
-              {latestDeployment?.gitCommitHash?.slice(0, 7)}
+              Created{" "}
+              {project?.createdAt &&
+                formatDistanceToNow(new Date(project.createdAt))}{" "}
+              ago
             </p>
-            <span className="flex items-center gap-2 text-sm">
-              <GitBranch className="w-4 text-primary" />
-              {latestDeployment?.gitBranchName}
-            </span>
+          )}
+          <div className="flex items-end gap-2">
+            {isLoading ? (
+              <>
+                <Skeleton className="h-4 w-24 mt-3 ml-1" />
+                <Skeleton className="h-4 w-32" />
+              </>
+            ) : (
+              <>
+                <p className="text-sm text-muted-foreground mt-3 ml-1">
+                  {latestDeployment?.gitCommitHash?.slice(0, 7)}
+                </p>
+                <span className="flex items-center gap-2 text-sm">
+                  <GitBranch className="w-4 text-primary" />
+                  {latestDeployment?.gitBranchName}
+                </span>
+              </>
+            )}
           </div>
         </CardContent>
       </Card>

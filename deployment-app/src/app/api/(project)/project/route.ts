@@ -36,10 +36,7 @@ export async function GET(req: NextRequest) {
     const userId = req.nextUrl.searchParams.get("userId");
 
     if (!userId) {
-      return NextResponse.json({
-        status: 400,
-        message: "userId is required",
-      });
+      throw new Error(await handleApiError("userId is required"));
     }
 
     const projects = await prisma.project.findMany({
@@ -48,10 +45,7 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ status: 200, project: projects });
   } catch (error) {
-    return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
-    });
+    throw new Error(await handleApiError(error));
   }
 }
 
@@ -63,11 +57,11 @@ export async function POST(req: NextRequest) {
     const validatedData = ProjectModel.safeParse({ ...body, subDomain });
 
     if (!validatedData.success) {
-      return NextResponse.json({
-        status: 400,
-        message: "Invalid request data",
-        errors: validatedData.error.flatten().fieldErrors,
-      });
+      throw new Error(
+        await handleApiError(
+          `Invalid request data: ${validatedData.error.flatten().fieldErrors}`
+        )
+      );
     }
 
     const {
@@ -94,10 +88,7 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ status: 200, project: project });
   } catch (error) {
-    return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
-    });
+    throw new Error(await handleApiError(error));
   }
 }
 
@@ -109,17 +100,13 @@ export async function PATCH(req: NextRequest) {
     const { newSubDomain } = await req.json();
 
     if (!projectId || !deploymentId) {
-      return NextResponse.json({
-        status: 400,
-        message: "Project ID and deployment ID are required",
-      });
+      throw new Error(
+        await handleApiError("Project ID and deployment ID are required")
+      );
     }
 
     if (!newSubDomain) {
-      return NextResponse.json({
-        status: 400,
-        message: "newSubDomain is required in request body",
-      });
+      throw new Error(await handleApiError("newSubDomain is required"));
     }
 
     // Get the existing project
@@ -128,18 +115,16 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!existingProject) {
-      return NextResponse.json({ status: 404, message: "Project not found" });
+      throw new Error(await handleApiError("Project not found"));
     }
 
     const oldSubDomain = existingProject.subDomain;
 
     // Only proceed if the subdomain is actually different
     if (oldSubDomain === newSubDomain) {
-      return NextResponse.json({
-        status: 200,
-        message: "New subdomain is same as current subdomain",
-        project: existingProject,
-      });
+      throw new Error(
+        await handleApiError("New subdomain is same as current subdomain")
+      );
     }
 
     const oldPrefix = `__outputs/${oldSubDomain}/`;
@@ -212,10 +197,7 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!existingDeployment) {
-      return NextResponse.json({
-        status: 404,
-        message: "Deployment not found",
-      });
+      throw new Error(await handleApiError("Deployment not found"));
     }
 
     // Parse existing environment variables
@@ -240,10 +222,7 @@ export async function PATCH(req: NextRequest) {
       project: updatedProject,
     });
   } catch (error) {
-    return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
-    });
+    throw new Error(await handleApiError(error));
   }
 }
 
@@ -257,10 +236,7 @@ export async function DELETE(req: NextRequest) {
     const projectId = req.nextUrl.searchParams.get("projectId");
 
     if (!projectId) {
-      return NextResponse.json({
-        status: 400,
-        message: "projectId is required",
-      });
+      throw new Error(await handleApiError("projectId is required"));
     }
 
     const project = await prisma.project.findUnique({
@@ -269,7 +245,7 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (!project) {
-      return NextResponse.json({ status: 404, message: `Project not found` });
+      throw new Error(await handleApiError(`Project not found`));
     }
 
     // Delete webhook if it exists
@@ -334,9 +310,6 @@ export async function DELETE(req: NextRequest) {
       message: `Project and S3 folder deleted successfully`,
     });
   } catch (error) {
-    return NextResponse.json({
-      status: 500,
-      message: error instanceof Error ? error.message : "Internal server error",
-    });
+    throw new Error(await handleApiError(error));
   }
 }
