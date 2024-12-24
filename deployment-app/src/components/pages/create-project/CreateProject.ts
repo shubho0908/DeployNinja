@@ -85,7 +85,6 @@ export const useCreateProject = () => {
       const project = await dispatch(createProject(projectParams)).unwrap();
       console.log(project);
       
-
       if (!project?.id) throw new Error("Project creation failed");
 
       const deployment = await dispatch(startDeployment({

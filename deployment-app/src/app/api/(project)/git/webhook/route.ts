@@ -3,8 +3,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { fetchGitLatestCommit } from "@/utils/github";
 import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
-import axios from "axios";
-import { handleApiError } from "@/redux/api/util";
+import { API, handleApiError } from "@/redux/api/util";
 
 // Verify GitHub webhook signature
 function verifyGitHubWebhook(req: NextRequest, payload: string): boolean {
@@ -101,21 +100,18 @@ export async function POST(req: NextRequest) {
       environmentVariables: project.deployments[0]?.environmentVariables || {},
     };
 
-    // Send deployment request to your existing deployment endpoint
-    // TODO: Update with axios
+    // Send deployment request to existing deployment endpoint
     console.log("Sending deployment request...");
 
-    const deployResponse = await fetch("http://localhost:3000/api/deploy", {
-      method: "POST",
+    const deployResponse = await API.post(`/deploy`, deploymentPayload, {
       headers: {
         "Content-Type": "application/json",
         Authorization: `Bearer ${accessToken}`,
         "X-Request-Maker": "webhook",
       },
-      body: JSON.stringify(deploymentPayload),
     });
 
-    const deployResult = await deployResponse.json();
+    const deployResult = await deployResponse.data;
 
     // Log deployment result
     console.log(

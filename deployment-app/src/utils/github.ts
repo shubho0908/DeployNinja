@@ -1,5 +1,4 @@
 import { Octokit } from "@octokit/rest";
-import { access } from "fs";
 import { z } from "zod";
 
 // Schema definitions
@@ -8,7 +7,6 @@ const GitResponseSchema = z.object({
   message: z.string().optional(),
 });
 
-// Types
 const GitRepoParamsSchema = z.object({
   owner: z.string(),
   repo: z.string(),
@@ -21,14 +19,31 @@ const FetchGitInfoParamsSchema = z.object({
   branch: z.string(),
 });
 
+const GithubRepositorySchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  full_name: z.string(),
+  html_url: z.string().url(),
+  description: z.string().nullable(),
+  private: z.boolean(),
+  default_branch: z.string(),
+  updated_at: z.string().datetime(),
+});
+
+const GithubRepositoriesResponseSchema = z.array(GithubRepositorySchema);
+
+type GithubRepository = z.infer<typeof GithubRepositorySchema>;
 type GitRepoParams = z.infer<typeof GitRepoParamsSchema>;
 export type FetchGitInfoParams = z.infer<typeof FetchGitInfoParamsSchema>;
 type GitResponse = z.infer<typeof GitResponseSchema>;
 
-// Constants
-const GITHUB_TOKEN = process.env.GITHUB_TOKEN;
-
 // Utility functions
+/**
+ * Parses a Git repository URL to extract owner, repository name, and branch.
+ * @param url The Git repository URL.
+ * @param branch The branch name to be used.
+ * @returns An object containing the owner, repo, and branch if valid; otherwise, null.
+ */
 function parseGitUrl(url: string, branch: string): GitRepoParams | null {
   const parts = url.split("/");
   if (parts.length < 5) return null;
@@ -51,6 +66,17 @@ function parseGitUrl(url: string, branch: string): GitRepoParams | null {
   };
 }
 
+/**
+ * Fetches the latest commit information for a given Git repository.
+ * @param {FetchGitInfoParams} params Object containing the required parameters.
+ * @param {string} params.accessToken A GitHub Personal Access Token with the "repo" scope.
+ * @param {string} params.repoUrl The URL of the Git repository.
+ * @param {string} params.branch The branch name to fetch the latest commit for.
+ * @returns {Promise<GitResponse>} A promise resolving to an object containing the latest commit SHA and message.
+ * @throws {Error} If the GitHub token is not configured.
+ * @throws {Error} If the repository URL is in an invalid format.
+ * @throws {Error} If the GitHub API request fails.
+ */
 export async function fetchGitLatestCommit({
   accessToken,
   repoUrl,
@@ -96,21 +122,11 @@ export async function fetchGitLatestCommit({
   }
 }
 
-const GithubRepositorySchema = z.object({
-  id: z.number(),
-  name: z.string(),
-  full_name: z.string(),
-  html_url: z.string().url(),
-  description: z.string().nullable(),
-  private: z.boolean(),
-  default_branch: z.string(),
-  updated_at: z.string().datetime(),
-});
-
-const GithubRepositoriesResponseSchema = z.array(GithubRepositorySchema);
-
-type GithubRepository = z.infer<typeof GithubRepositorySchema>;
-
+/**
+ * Fetch a list of repositories that a user has access to.
+ * @param accessToken a GitHub Personal Access Token with the "read:user" and "repo" scopes
+ * @returns a list of {@link GithubRepository} objects
+ */
 export async function fetchGitUserRepositories(
   accessToken: string
 ): Promise<GithubRepository[]> {
@@ -165,104 +181,5 @@ export async function fetchGitUserRepositories(
       throw new Error(`GitHub API Error: ${error.message}`);
     }
     throw new Error("Failed to fetch repository data");
-  }
-}
-
-// Create GitHub webhook for specified repository
-async function createGitHubWebhook(
-  repoUrl: string,
-  secret: string,
-  webhookUrl: string,
-  accessToken: string
-) {
-  // GitHub API client
-  const octokit = new Octokit({
-    auth: accessToken,
-  });
-
-  const [owner, repo] = repoUrl.replace("https://github.com/", "").split("/");
-
-  try {
-    console.log("Checking if webhook already exists...");
-
-    // Check if webhook already exists
-    const { data: webhooks } = await octokit.request(
-      "GET /repos/{owner}/{repo}/hooks",
-      {
-        owner,
-        repo,
-        headers: {
-          "X-GitHub-Api-Version": "2022-11-28",
-        },
-      }
-    );
-
-    if (webhooks.some((hook) => hook.config.url === webhookUrl)) {
-      console.log("Webhook already exists for this repository.");
-      return;
-    }
-
-    // Create webhook using direct request method
-    await octokit.request("POST /repos/{owner}/{repo}/hooks", {
-      owner,
-      repo,
-      config: {
-        url: webhookUrl,
-        secret,
-        content_type: "json",
-      },
-      events: ["push"],
-      active: true,
-      headers: {
-        "X-GitHub-Api-Version": "2022-11-28",
-      },
-    });
-
-    console.log("Webhook created successfully.");
-  } catch (error: unknown) {
-    // Type guard to check if error is an object with status property
-    if (
-      error instanceof Error &&
-      "status" in error &&
-      (error as { status: number }).status === 404
-    ) {
-      try {
-        // Attempt to create the webhook directly if the repository is not found
-        await octokit.request("POST /repos/{owner}/{repo}/hooks", {
-          owner,
-          repo,
-          config: {
-            url: webhookUrl,
-            secret,
-            content_type: "json",
-          },
-          events: ["push"],
-          active: true,
-          headers: {
-            "X-GitHub-Api-Version": "2022-11-28",
-          },
-        });
-        console.log("Webhook created successfully after 404 error.");
-      } catch (createError: unknown) {
-        // Handle potential error in webhook creation
-        if (createError instanceof Error) {
-          console.error(
-            "Failed to create GitHub webhook after 404:",
-            createError.message
-          );
-          throw new Error(
-            `Failed to create GitHub webhook: ${createError.message}`
-          );
-        }
-
-        // Fallback for any unexpected errors
-        console.error("Unexpected error creating webhook:", createError);
-        throw createError;
-      }
-    } else {
-      // Handle other types of errors
-      console.error("Failed to create GitHub webhook:", error);
-      throw error;
-    }
   }
 }

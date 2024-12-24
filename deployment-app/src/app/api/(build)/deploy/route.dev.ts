@@ -3,10 +3,106 @@ import { DeploymentModel } from "@/types/schemas/Deployment";
 import { fetchGitLatestCommit } from "@/utils/github";
 import { DeploymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
+import { Octokit } from "@octokit/rest";
+import { exec } from "child_process";
 import { handleApiError } from "@/redux/api/util";
-import { RunTaskCommand } from "@aws-sdk/client-ecs";
-import { createGitHubWebhook } from "./createGithubWebhook";
-import { ecsClient } from "@/lib/aws";
+
+// Function to create a Github webhook for a given repository
+async function createGitHubWebhook(
+  projectId: string,
+  repoUrl: string,
+  secret: string,
+  webhookUrl: string,
+  accessToken: string
+) {
+  // GitHub API client
+  const octokit = new Octokit({
+    auth: accessToken,
+  });
+
+  const [owner, repo] = repoUrl.replace("https://github.com/", "").split("/");
+
+  try {
+    console.log("Checking if webhook already exists...");
+
+    // Check if webhook already exists
+    const { data: webhooks } = await octokit.request(
+      "GET /repos/{owner}/{repo}/hooks",
+      {
+        owner,
+        repo,
+        headers: {
+          "X-GitHub-Api-Version": "2022-11-28",
+        },
+      }
+    );
+
+    if (webhooks.some((hook) => hook.config.url === webhookUrl)) {
+      console.log("Webhook already exists for this repository.");
+      return;
+    } else {
+      // Create webhook using direct request method
+      const webhook = await octokit.request(
+        "POST /repos/{owner}/{repo}/hooks",
+        {
+          owner,
+          repo,
+          config: {
+            url: webhookUrl,
+            secret,
+            content_type: "json",
+          },
+          events: ["push"],
+          active: true,
+          headers: {
+            "X-GitHub-Api-Version": "2022-11-28",
+          },
+        }
+      );
+
+      await prisma.project.update({
+        where: { id: projectId },
+        data: { webhookId: webhook.data.id },
+      });
+
+      console.log("Webhook created successfully. ", webhook.data.id);
+    }
+  } catch (error) {
+    throw new Error(await handleApiError(error));
+  }
+}
+
+// Function to run Docker deployment
+async function runDockerDeploymentWithCLI(
+  deploymentId: string,
+  ecrImage: string,
+  environmentVariables: Record<string, string> = {}
+) {
+  try {
+    const envVars = Object.entries(environmentVariables)
+      .map(([key, value]) => `-e ${key}="${value}"`)
+      .join(" ");
+
+    const command = `docker run -d -i -t ${envVars} -e DEPLOYEMENT_ID=${deploymentId} ${ecrImage}`;
+    console.log(`Running command: ${command}`);
+
+    await new Promise((resolve, reject) => {
+      exec(command, (error, stdout, stderr) => {
+        if (error) {
+          console.error("Docker CLI error:", stderr || error.message);
+          reject(new Error("Docker CLI deployment failed"));
+        } else {
+          console.log("Docker CLI output:", stdout);
+          resolve(stdout);
+        }
+      });
+    });
+
+    console.log("Docker container started successfully.");
+  } catch (error) {
+    throw new Error(await handleApiError(error));
+  }
+}
 
 export async function GET(req: NextRequest) {
   try {
@@ -34,7 +130,9 @@ export async function POST(req: NextRequest) {
     // Extract the access token from the Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new Error("Authorization token missing or invalid");
+      throw new Error(
+        await handleApiError("Authorization token missing or invalid")
+      );
     }
 
     const accessToken = authHeader.split(" ")[1];
@@ -62,7 +160,7 @@ export async function POST(req: NextRequest) {
 
     if (!parsedData.success) {
       console.log("Error ", parsedData.error);
-      throw new Error("Invalid request");
+      throw new Error(await handleApiError("Invalid request"));
     }
 
     const project = await prisma.project.findUnique({
@@ -70,32 +168,13 @@ export async function POST(req: NextRequest) {
     });
 
     if (!project) {
-      throw new Error("Project not found");
+      throw new Error(await handleApiError("Project not found"));
     }
 
-    // Verify required AWS environment variables
-    const requiredEnvVars = [
-      "CLUSTER",
-      "TASK",
-      "SUBNETS",
-      "SECURITY_GROUPS",
-      "AWS_ECR_IMAGE",
-    ];
-
-    for (const envVar of requiredEnvVars) {
-      if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
-      }
-    }
-
-    // Create GitHub webhook
+    // TODO: add if request maker is webhook
     try {
       const webhookUrl = `${process.env.WEBHOOK_BASE_URL}/api/git/webhook?projectId=${projectId}`;
-      const webhookSecret = process.env.WEBHOOK_SECRET;
-
-      if (!webhookSecret) {
-        throw new Error("Webhook secret is not configured");
-      }
+      const webhookSecret = process.env.WEBHOOK_SECRET!;
 
       await createGitHubWebhook(
         projectId,
@@ -105,7 +184,6 @@ export async function POST(req: NextRequest) {
         accessToken
       );
     } catch (error) {
-      console.error("Webhook creation failed:", error);
       throw new Error(await handleApiError(error));
     }
 
@@ -116,12 +194,7 @@ export async function POST(req: NextRequest) {
     });
 
     try {
-      const envVarsObjectWithProjectUri = {
-        ...envVarsObject,
-        PROJECT_URI: project.subDomain,
-      };
-
-      // Create a deployment record with initial status
+      // Create a deployment record
       const deployment = await prisma.deployment.create({
         data: {
           projectId,
@@ -129,105 +202,47 @@ export async function POST(req: NextRequest) {
           gitCommitHash: gitInfo.latestCommit,
           deploymentStatus: DeploymentStatus.IN_PROGRESS,
           deploymentMessage: "Deployment has been started",
-          environmentVariables: JSON.stringify(envVarsObjectWithProjectUri),
+          environmentVariables: JSON.stringify(envVarsObject),
         },
       });
+
+      const envVarsObjectWithProjectUri = {
+        ...envVarsObject,
+        PROJECT_URI: project.subDomain,
+      };
+
+      await runDockerDeploymentWithCLI(
+        deployment.id,
+        process.env.AWS_ECR_IMAGE_URI!,
+        envVarsObjectWithProjectUri
+      );
 
       console.log("Deployment created successfully:", deployment);
-
-      // Transform environment variables into the correct format for ECS
-      const environmentVariables = Object.entries(
-        envVarsObjectWithProjectUri
-      ).map(([name, value]) => ({
-        name,
-        value: String(value),
-      }));
-
-      // Create ECS task
-      const command = new RunTaskCommand({
-        cluster: process.env.CLUSTER!,
-        taskDefinition: process.env.TASK!,
-        launchType: "FARGATE",
-        count: 1,
-        networkConfiguration: {
-          awsvpcConfiguration: {
-            subnets: process.env.SUBNETS!.split(","),
-            securityGroups: process.env.SECURITY_GROUPS!.split(","),
-            assignPublicIp: "ENABLED",
-          },
-        },
-        overrides: {
-          containerOverrides: [
-            {
-              name: process.env.AWS_ECR_IMAGE!,
-              environment: [
-                ...environmentVariables,
-                { name: "DEPLOYMENT_ID", value: deployment.id },
-              ],
-            },
-          ],
-        },
-      });
-
-      const response = await ecsClient.send(command);
-
-      // Enhanced validation for ECS task response
-      if (!response.tasks || response.tasks.length === 0) {
-        throw new Error("Failed to start deployment task: No tasks created");
-      }
-
-      const task = response.tasks[0];
-      if (!task.taskArn) {
-        throw new Error("Failed to start deployment task: TaskArn is missing");
-      }
-
-      console.log("Task created successfully", task.taskArn);
-
-      // Update deployment with taskArn and validate the update
-      const updatedDeployment = await prisma.deployment.update({
-        where: { id: deployment.id },
-        data: { taskArn: task.taskArn },
-        select: { id: true, taskArn: true },
-      });
-
-      if (!updatedDeployment.taskArn) {
-        throw new Error("Failed to update deployment with TaskArn");
-      }
 
       return NextResponse.json({
         status: 200,
         message: "Deployment started",
         data: {
-          deployment: updatedDeployment,
+          deployment,
           subDomain: project.subDomain,
           url: `http://${project.subDomain}.localhost:8000`,
         },
       });
     } catch (error) {
-      const envVarsObjectWithProjectUri = {
-        ...envVarsObject,
-        PROJECT_URI: project.subDomain,
-      };
-      
-      // Create a failed deployment record with detailed error message
-      const failureMessage = error instanceof Error 
-        ? `Deployment failed: ${error.message}`
-        : "Failed to start deployment with unknown error";
-
+      // Create a deployment record
       await prisma.deployment.create({
         data: {
           projectId,
           gitBranchName,
           gitCommitHash: gitInfo.latestCommit,
           deploymentStatus: DeploymentStatus.FAILED,
-          deploymentMessage: failureMessage,
-          environmentVariables: JSON.stringify(envVarsObjectWithProjectUri),
+          deploymentMessage: "Deployment has been started",
+          environmentVariables: JSON.stringify(envVarsObject),
         },
       });
-      throw error;
+      throw new Error(await handleApiError("Failed to start deployment"));
     }
   } catch (error) {
-    console.error("Deployment failed:", error);
     throw new Error(await handleApiError(error));
   }
 }

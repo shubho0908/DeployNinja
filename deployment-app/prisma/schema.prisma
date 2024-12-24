@@ -52,6 +52,7 @@ model Deployment {
   deploymentStatus     DeploymentStatus @default(NOT_STARTED)
   deploymentMessage    String?
   environmentVariables String?
+  taskArn              String?
   createdAt            DateTime         @default(now())
   updatedAt            DateTime         @updatedAt
 }

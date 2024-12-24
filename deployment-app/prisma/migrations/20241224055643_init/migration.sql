@@ -6,7 +6,6 @@ CREATE TABLE "User" (
     "id" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "username" TEXT NOT NULL,
-    "email" TEXT,
     "profileImage" TEXT,
     "isGithubConnected" BOOLEAN NOT NULL DEFAULT false,
     "githubAccessToken" TEXT NOT NULL,
@@ -22,9 +21,9 @@ CREATE TABLE "Project" (
     "name" TEXT NOT NULL,
     "ownerId" TEXT NOT NULL,
     "framework" TEXT NOT NULL,
-    "subDomain" TEXT,
-    "customDomain" TEXT,
+    "subDomain" TEXT NOT NULL,
     "gitRepoUrl" TEXT NOT NULL,
+    "webhookId" INTEGER,
     "installCommand" TEXT,
     "buildCommand" TEXT,
     "projectRootDir" TEXT,
@@ -53,7 +52,7 @@ CREATE TABLE "Deployment" (
 CREATE UNIQUE INDEX "User_username_key" ON "User"("username");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "User_email_key" ON "User"("email");
+CREATE UNIQUE INDEX "Project_subDomain_key" ON "Project"("subDomain");
 
 -- AddForeignKey
 ALTER TABLE "Project" ADD CONSTRAINT "Project_ownerId_fkey" FOREIGN KEY ("ownerId") REFERENCES "User"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -10,7 +10,7 @@ export async function GET() {
       throw new Error("User not authenticated");
     }
 
-    const existingUser = await prisma.user.findFirst({
+    const existingUser = await prisma.user.findUnique({
       where: { username: session.username },
     });
 

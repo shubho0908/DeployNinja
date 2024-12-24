@@ -2,11 +2,7 @@
 
 import Link from "next/link";
 import { formatDistanceToNow } from "date-fns";
-import {
-  ChevronLeft,
-  ExternalLink,
-  Github,
-} from "lucide-react";
+import { ChevronLeft, ExternalLink, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Accordion } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -15,32 +11,12 @@ import { CustomDomainsSection } from "./CustomDomain";
 import { getProjects } from "@/redux/api/projectApi";
 import { useDeploymentDetails } from "./useDeploymentDetails";
 import { useAppDispatch } from "@/redux/hooks";
-
-interface StatusIndicatorProps {
-  status: string;
-}
-
-const StatusIndicator = ({ status }: StatusIndicatorProps) => (
-  <div className="flex items-center gap-2">
-    <span className={`w-2 h-2 rounded-full ${
-      status === "READY" ? "bg-green-500" : 
-      status === "FAILED" ? "bg-red-500" : 
-      "bg-yellow-500"
-    }`} />
-    <span className="text-sm">{status}</span>
-  </div>
-);
+import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
 
 interface HeaderButtonProps {
   href: string;
   children: React.ReactNode;
 }
-
-const HeaderButton = ({ href, children }: HeaderButtonProps) => (
-  <Link href={href} target="_blank">
-    <Button variant="secondary">{children}</Button>
-  </Link>
-);
 
 interface DetailItemProps {
   label: string;
@@ -48,28 +24,41 @@ interface DetailItemProps {
   isLoading?: boolean;
 }
 
-const DetailItem = ({ label, value, isLoading }: DetailItemProps) => (
-  <div>
-    <h4 className="text-zinc-500 dark:text-zinc-400 text-sm mb-1">{label}</h4>
-    {isLoading ? (
-      <Skeleton className="h-6 w-48" />
-    ) : value}
+const StatusIndicator = ({ status }: { status: DeploymentStatus }) => (
+  <div className="flex items-center gap-2">
+    <span
+      className={`w-2 h-2 rounded-full ${
+        status === "READY"
+          ? "bg-green-500"
+          : status === "FAILED"
+          ? "bg-red-500"
+          : "bg-yellow-500"
+      }`}
+    />
+    <span className="text-sm">{status}</span>
   </div>
 );
 
-interface DeploymentDetailsProps {
-  deploymentId: string;
-}
+const HeaderButton = ({ href, children }: HeaderButtonProps) => (
+  <Link href={href} target="_blank">
+    <Button variant="secondary">{children}</Button>
+  </Link>
+);
 
-export default function DeploymentDetails({ deploymentId }: DeploymentDetailsProps) {
+const DetailItem = ({ label, value, isLoading }: DetailItemProps) => (
+  <div>
+    <h4 className="text-zinc-500 dark:text-zinc-400 text-sm mb-1">{label}</h4>
+    {isLoading ? <Skeleton className="h-6 w-48" /> : value}
+  </div>
+);
+export default function DeploymentDetails({
+  deploymentId,
+}: {
+  deploymentId: string;
+}) {
   const dispatch = useAppDispatch();
-  const {
-    project,
-    latestDeployment,
-    buildLogs,
-    isPolling,
-    isLoading
-  } = useDeploymentDetails(deploymentId);
+  const { project, latestDeployment, buildLogs, isLoading } =
+    useDeploymentDetails(deploymentId);
 
   return (
     <div className="min-h-screen bg-white dark:bg-zinc-950 text-zinc-900 dark:text-white p-8">
@@ -80,12 +69,10 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
             All Projects
           </Button>
         </Link>
-        
+
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-semibold">
-            {isLoading ? (
-              <Skeleton className="h-9 w-64" />
-            ) : project?.name}
+            {isLoading ? <Skeleton className="h-9 w-64" /> : project?.name}
           </h1>
         </div>
 
@@ -121,12 +108,12 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
               </div>
 
               <div className="space-y-6">
-                <DetailItem 
-                  label="Deployment ID" 
+                <DetailItem
+                  label="Deployment ID"
                   value={latestDeployment?.id}
                   isLoading={isLoading}
                 />
-                
+
                 <div>
                   <h4 className="text-zinc-500 dark:text-zinc-400 text-sm mb-1">
                     Domains
@@ -153,21 +140,31 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
                       <Skeleton className="h-6 w-24" />
                       <Skeleton className="h-4 w-48" />
                     </div>
-                  ) : latestDeployment && (
-                    <>
-                      <StatusIndicator status={latestDeployment.deploymentStatus} />
-                      <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-                        Created {formatDistanceToNow(new Date(latestDeployment?.createdAt!))} ago
-                      </p>
-                    </>
+                  ) : (
+                    latestDeployment && (
+                      <>
+                        <StatusIndicator
+                          status={latestDeployment.deploymentStatus}
+                        />
+                        <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
+                          Created{" "}
+                          {formatDistanceToNow(
+                            new Date(latestDeployment?.createdAt!)
+                          )}{" "}
+                          ago
+                        </p>
+                      </>
+                    )
                   )}
                 </div>
 
-                <DetailItem 
+                <DetailItem
                   label="Source"
                   value={
                     <>
-                      <p className="text-sm">{latestDeployment?.gitBranchName}</p>
+                      <p className="text-sm">
+                        {latestDeployment?.gitBranchName}
+                      </p>
                       <p className="text-sm text-zinc-500 dark:text-zinc-400">
                         {latestDeployment?.gitCommitHash?.slice(0, 7)}
                       </p>
@@ -179,17 +176,16 @@ export default function DeploymentDetails({ deploymentId }: DeploymentDetailsPro
             </div>
           </div>
 
-          <Accordion type="multiple" className="border border-zinc-200 dark:border-zinc-800 rounded-lg">
-            <BuildLogsSection 
+          <Accordion
+            type="multiple"
+            className="border border-zinc-200 dark:border-zinc-800 rounded-lg"
+          >
+            <BuildLogsSection
               buildLogs={buildLogs}
-              isLoading={isLoading}
-              isPolling={isPolling}
               latestDeployment={latestDeployment}
             />
-            
-            <CustomDomainsSection 
-              isLoading={isLoading}
-              isPolling={isPolling}
+
+            <CustomDomainsSection
               project={project}
               latestDeployment={latestDeployment}
               onSuccess={() => {

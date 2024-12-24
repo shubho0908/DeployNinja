@@ -1,108 +1,121 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSelector } from "react-redux";
 import { useAppDispatch } from "@/redux/hooks";
-import { getDeployments, updateDeployment } from "@/redux/api/deploymentApi";
+import { getDeployments } from "@/redux/api/deploymentApi";
 import { API } from "@/redux/api/util";
 import { RootState } from "@/app/store";
+
 import { z } from "zod";
+import { DeploymentModel } from "@/types/schemas/Deployment";
+import { Project } from "@/types/schemas/Project";
+import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
+import { BuildLogsSchema } from "@/app/api/(build)/build-logs/route";
 
-const BuildLogSchema = z.object({
-  deploymentId: z.string(),
-  log: z.string(),
-  timestamp: z.string(),
-});
+export type BuildLog = z.infer<typeof BuildLogsSchema>;
 
-type BuildLog = z.infer<typeof BuildLogSchema>;
+const POLLING_INTERVAL = 5000; // 5 seconds
+
+// Define deployment status types
+const TERMINAL_STATES: readonly DeploymentStatus[] = ["READY", "FAILED"];
 
 export const useDeploymentDetails = (deploymentId: string) => {
   const dispatch = useAppDispatch();
   const { projects } = useSelector((state: RootState) => state.projects);
-  
   const [buildLogs, setBuildLogs] = useState<BuildLog[]>([]);
-  const [isPolling, setIsPolling] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-
-  const project = useMemo(
-    () => projects?.find((p) => p.deployments?.some((d) => d.id === deploymentId)),
-    [projects, deploymentId]
+  const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
+    null
   );
 
-  const latestDeployment = useMemo(
-    () => project?.deployments?.find((d) => d.id === deploymentId) || null,
-    [project?.deployments, deploymentId]
-  );
+  // Find current project and deployment
+  const project = projects?.find((p) =>
+    p.deployments?.some((d) => d.id === deploymentId)
+  ) as Project;
+  const deployment = project?.deployments?.find(
+    (d) => d.id === deploymentId
+  ) as DeploymentModel;
 
+  // Fetch build logs from API
+  const fetchBuildLogs = async () => {
+    if (!deployment?.id) return;
+
+    setIsLoading(true);
+    try {
+      const { data } = await API.get(
+        `/build-logs?deploymentId=${deployment.id}`
+      );
+      setBuildLogs(data?.logs);
+
+      // Refresh deployment data if status changed
+      if (data?.status !== deployment.deploymentStatus) {
+        await dispatch(getDeployments(project?.id!));
+      }
+
+      // Stop polling if we've reached a terminal state
+      if (
+        TERMINAL_STATES.includes(
+          deployment.deploymentStatus as DeploymentStatus
+        )
+      ) {
+        stopPolling();
+      }
+    } catch (error) {
+      console.error("Failed to fetch build logs:", error);
+    } finally {
+      setIsLoading(false);
+    }
+  };
+
+  // Start polling
+  const startPolling = () => {
+    if (!pollingInterval) {
+      fetchBuildLogs(); // Initial fetch
+      const interval = setInterval(fetchBuildLogs, POLLING_INTERVAL);
+      setPollingInterval(interval);
+    }
+  };
+
+  // Stop polling
+  const stopPolling = () => {
+    if (pollingInterval) {
+      clearInterval(pollingInterval);
+      setPollingInterval(null);
+    }
+  };
+
+  // Fetch initial deployment data
   useEffect(() => {
     if (project?.id) {
       dispatch(getDeployments(project.id));
     }
   }, [project?.id, dispatch]);
 
+  // Handle polling and single fetch logic
   useEffect(() => {
-    if (!latestDeployment?.id) return;
+    if (!deployment?.id) return;
 
-    let pollingInterval: NodeJS.Timeout | undefined;
-    let pollingStartTime: number | undefined;
-
-    const fetchBuildLogs = async () => {
-      setIsLoading(true);
-      try {
-        const { data } = await API.get(`/build-logs?deploymentId=${latestDeployment.id}`);
-        setBuildLogs(data?.logs);
-
-        if (pollingStartTime && Date.now() - pollingStartTime > 60000) {
-          dispatch(updateDeployment({
-            deploymentId: latestDeployment.id!,
-            deploymentStatus: "FAILED"
-          }));
-          setIsPolling(false);
-          clearInterval(pollingInterval);
-          return;
-        }
-
-        if (["READY", "FAILED"].includes(latestDeployment.deploymentStatus)) {
-          setIsPolling(false);
-          clearInterval(pollingInterval);
-        } else if (
-          data?.logs.some((log: any) => log.log.includes("Upload complete...")) ||
-          data?.logs.some((log: any) => /error/i.test(log.log))
-        ) {
-          dispatch(getDeployments(project?.id!));
-        }
-      } catch (error) {
-        console.error("Failed to fetch build logs:", error);
-        setIsPolling(false);
-        clearInterval(pollingInterval);
-      } finally {
-        setIsLoading(false);
-      }
-    };
-
-    const shouldStartPolling = !["READY", "FAILED"].includes(
-      latestDeployment.deploymentStatus
+    const isTerminalState = TERMINAL_STATES.includes(
+      deployment.deploymentStatus as DeploymentStatus
     );
 
-    if (shouldStartPolling && !isPolling) {
-      setIsPolling(true);
-      pollingStartTime = Date.now();
+    if (isTerminalState) {
+      // For terminal states, fetch once and stop polling
       fetchBuildLogs();
-      pollingInterval = setInterval(fetchBuildLogs, 5000);
-    } else if (["READY", "FAILED"].includes(latestDeployment.deploymentStatus)) {
-      fetchBuildLogs();
+      stopPolling();
+    } else {
+      // For non-terminal states, start polling
+      startPolling();
     }
 
-    return () => {
-      if (pollingInterval) {
-        clearInterval(pollingInterval);
-      }
-    };
-  }, [latestDeployment?.id, latestDeployment?.deploymentStatus, project?.id, dispatch]);
+    return () => stopPolling();
+  }, [deployment?.id, deployment?.deploymentStatus]);
 
   return {
     project,
-    latestDeployment,
+    deployment,
     buildLogs,
-    isPolling,
-    isLoading
+    isLoading,
+    latestDeployment: deployment,
+    isPolling: !!pollingInterval,
   };
 };
