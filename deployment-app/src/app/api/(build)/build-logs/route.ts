@@ -17,39 +17,79 @@ export const BuildLogsSchema = z.object({
 
 type BuildLogs = z.infer<typeof BuildLogsSchema>;
 
-// Fetch and process build logs
 export async function GET(req: NextRequest) {
   const deploymentId = req.nextUrl.searchParams.get("deploymentId");
 
   if (!deploymentId) {
-    throw new Error(await handleApiError("Deployment ID is required"));
+    return NextResponse.json(
+      { error: "Deployment ID is required" },
+      { status: 400 }
+    );
   }
 
   try {
+    // First, get the current deployment status
+    const deployment = await prisma.deployment.findUnique({
+      where: { id: deploymentId },
+      select: { 
+        taskArn: true,
+        deploymentStatus: true
+      },
+    });
+
+    if (!deployment) {
+      return NextResponse.json(
+        { error: "Deployment not found" },
+        { status: 404 }
+      );
+    }
+
     const rawLogs = await fetchLogs(deploymentId);
-    await updateDeploymentStatus(deploymentId, rawLogs);
-    return NextResponse.json({ status: 200, logs: rawLogs });
+
+    // Only check ECS status if deployment is not in a final state
+    if (!isDeploymentInFinalState(deployment.deploymentStatus)) {
+      await updateDeploymentStatus(deploymentId, deployment.taskArn, rawLogs);
+    }
+
+    return NextResponse.json({ 
+      status: 200, 
+      logs: rawLogs,
+      deploymentStatus: deployment.deploymentStatus
+    });
   } catch (error) {
     console.error("Failed to fetch build logs:", error);
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      { error: "Failed to fetch build logs" },
+      { status: 500 }
+    );
   }
 }
 
-// Fetch logs from the database
-async function fetchLogs(deploymentId: string): Promise<BuildLogs[]> {
-  const logs = await client.query({
-    query:
-      "SELECT event_id, deployment_id, log, timestamp FROM log_events WHERE deployment_id = {deployment_id:String}",
-    query_params: { deployment_id: deploymentId },
-    format: "JSONEachRow",
-  });
-  return logs.json();
+// Helper function to check if deployment is in a final state
+function isDeploymentInFinalState(status: DeploymentStatus): boolean {
+  const finalStates: DeploymentStatus[] = ['READY', 'FAILED'];
+  return finalStates.includes(status);
 }
 
-// Check ECS task status
+async function fetchLogs(deploymentId: string): Promise<BuildLogs[]> {
+  try {
+    const logs = await client.query({
+      query:
+        "SELECT event_id, deployment_id, log, timestamp FROM log_events WHERE deployment_id = {deployment_id:String} ORDER BY timestamp ASC",
+      query_params: { deployment_id: deploymentId },
+      format: "JSONEachRow",
+    });
+    return logs.json();
+  } catch (error) {
+    console.error("Error fetching logs from ClickHouse:", error);
+    throw new Error("Failed to fetch deployment logs");
+  }
+}
+
 async function checkECSTaskStatus(taskArn: string): Promise<{
   isActive: boolean;
   isSuccessful: boolean;
+  error?: string;
 }> {
   try {
     const command = new DescribeTasksCommand({
@@ -61,19 +101,15 @@ async function checkECSTaskStatus(taskArn: string): Promise<{
     const task = response.tasks?.[0];
 
     if (!task) {
-      console.log("No task found for ARN");
-      return { isActive: false, isSuccessful: false };
+      return { 
+        isActive: false, 
+        isSuccessful: false,
+        error: "Task not found" 
+      };
     }
 
-    // console.log(task);
-
-    // Consider both PENDING and RUNNING as active states
-    const isActive = [
-      "PROVISIONING",
-      "PENDING",
-      "RUNNING",
-      "DEPROVISIONING",
-    ].includes(task.lastStatus || "");
+    const activeStates = ["PROVISIONING", "PENDING", "RUNNING", "DEPROVISIONING"];
+    const isActive = activeStates.includes(task.lastStatus || "");
 
     // Check for successful completion
     const isSuccessful =
@@ -88,47 +124,56 @@ async function checkECSTaskStatus(taskArn: string): Promise<{
     return { isActive, isSuccessful };
   } catch (error) {
     console.error("Error checking ECS task status:", error);
-    throw error;
+    return { 
+      isActive: false, 
+      isSuccessful: false,
+      error: "Failed to check task status" 
+    };
   }
 }
 
-// Update deployment status based on logs and ECS task status
-async function updateDeploymentStatus(deploymentId: string, logs: BuildLogs[]) {
-  const deployment = await prisma.deployment.findUnique({
-    where: { id: deploymentId },
-    select: { taskArn: true },
-  });
-
-  const taskArn = deployment?.taskArn;
-  let newStatus: DeploymentStatus = "IN_PROGRESS";
-
-  if (taskArn) {
-    const { isActive, isSuccessful } = await checkECSTaskStatus(taskArn);
-
-    if (isActive) {
-      // Task is either pending or running
-      newStatus = "IN_PROGRESS";
-      console.log("Task is active (pending or running)");
-    } else {
-      // Task is not active, check if it completed successfully
-      if (isSuccessful) {
-        console.log("Task completed successfully");
-        const hasUploadComplete = logs.some((log) =>
-          log.log.includes("Upload complete...")
-        );
-        newStatus = hasUploadComplete ? "READY" : "FAILED";
-      } else {
-        console.log("Task failed");
-        newStatus = "FAILED";
-      }
-    }
-  } else {
+async function updateDeploymentStatus(
+  deploymentId: string, 
+  taskArn: string | null, 
+  logs: BuildLogs[]
+) {
+  if (!taskArn) {
     console.log("No task ARN found for deployment");
+    await updateStatus(deploymentId, "FAILED");
+    return;
+  }
+
+  const { isActive, isSuccessful, error } = await checkECSTaskStatus(taskArn);
+
+  // If there's an error checking task status but deployment shows completion in logs,
+  // don't mark it as failed
+  const hasUploadComplete = logs.some((log) =>
+    log.log.includes("Upload complete...")
+  );
+
+  let newStatus: DeploymentStatus;
+
+  if (isActive) {
+    newStatus = "IN_PROGRESS";
+  } else if (error && hasUploadComplete) {
+    // If task is not found but logs show completion, keep it as READY
+    newStatus = "READY";
+  } else if (isSuccessful && hasUploadComplete) {
+    newStatus = "READY";
+  } else {
     newStatus = "FAILED";
   }
 
-  // Update deployment status
-  await API.patch(`/deploy?deploymentId=${deploymentId}`, {
-    deploymentStatus: newStatus,
-  });
+  await updateStatus(deploymentId, newStatus);
+}
+
+async function updateStatus(deploymentId: string, status: DeploymentStatus) {
+  try {
+    await API.patch(`/deploy?deploymentId=${deploymentId}`, {
+      deploymentStatus: status,
+    });
+  } catch (error) {
+    console.error("Failed to update deployment status:", error);
+    throw new Error("Failed to update deployment status");
+  }
 }

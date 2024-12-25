@@ -7,6 +7,7 @@ import { handleApiError } from "@/redux/api/util";
 import { RunTaskCommand } from "@aws-sdk/client-ecs";
 import { createGitHubWebhook } from "./createGithubWebhook";
 import { ecsClient } from "@/lib/aws";
+import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
   try {
@@ -173,12 +174,20 @@ export async function POST(req: NextRequest) {
 
       // Enhanced validation for ECS task response
       if (!response.tasks || response.tasks.length === 0) {
-        throw new Error("Failed to start deployment task: No tasks created");
+        throw new Error(
+          await handleApiError(
+            "Failed to start deployment task: No tasks created"
+          )
+        );
       }
 
       const task = response.tasks[0];
       if (!task.taskArn) {
-        throw new Error("Failed to start deployment task: TaskArn is missing");
+        throw new Error(
+          await handleApiError(
+            "Failed to start deployment task: TaskArn is missing"
+          )
+        );
       }
 
       console.log("Task created successfully", task.taskArn);
@@ -191,7 +200,7 @@ export async function POST(req: NextRequest) {
       });
 
       if (!updatedDeployment.taskArn) {
-        throw new Error("Failed to update deployment with TaskArn");
+        throw new Error(await handleApiError("Failed to update deployment"));
       }
 
       return NextResponse.json({
@@ -208,11 +217,12 @@ export async function POST(req: NextRequest) {
         ...envVarsObject,
         PROJECT_URI: project.subDomain,
       };
-      
+
       // Create a failed deployment record with detailed error message
-      const failureMessage = error instanceof Error 
-        ? `Deployment failed: ${error.message}`
-        : "Failed to start deployment with unknown error";
+      const failureMessage =
+        error instanceof Error
+          ? `Deployment failed: ${error.message}`
+          : "Failed to start deployment with unknown error";
 
       await prisma.deployment.create({
         data: {

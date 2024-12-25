@@ -4,14 +4,20 @@ import { useAppDispatch } from "@/redux/hooks";
 import { getDeployments } from "@/redux/api/deploymentApi";
 import { API } from "@/redux/api/util";
 import { RootState } from "@/app/store";
-
-import { z } from "zod";
 import { DeploymentModel } from "@/types/schemas/Deployment";
 import { Project } from "@/types/schemas/Project";
 import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
-import { BuildLogsSchema } from "@/app/api/(build)/build-logs/route";
+import { z } from "zod";
 
-export type BuildLog = z.infer<typeof BuildLogsSchema>;
+// Schema for build logs
+export const BuildLogsSchema = z.object({
+  event_id: z.string(),
+  deployment_id: z.string(),
+  log: z.string(),
+  timestamp: z.string(),
+});
+
+type BuildLogs = z.infer<typeof BuildLogsSchema>;
 
 const POLLING_INTERVAL = 5000; // 5 seconds
 
@@ -21,11 +27,12 @@ const TERMINAL_STATES: readonly DeploymentStatus[] = ["READY", "FAILED"];
 export const useDeploymentDetails = (deploymentId: string) => {
   const dispatch = useAppDispatch();
   const { projects } = useSelector((state: RootState) => state.projects);
-  const [buildLogs, setBuildLogs] = useState<BuildLog[]>([]);
+  const [buildLogs, setBuildLogs] = useState<BuildLogs[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [pollingInterval, setPollingInterval] = useState<NodeJS.Timeout | null>(
     null
   );
+  const [hasFetchedTerminalState, setHasFetchedTerminalState] = useState(false);
 
   // Find current project and deployment
   const project = projects?.find((p) =>
@@ -46,21 +53,18 @@ export const useDeploymentDetails = (deploymentId: string) => {
       );
       setBuildLogs(data?.logs);
 
-      // Refresh deployment data if status changed
-      if (data?.status !== deployment.deploymentStatus) {
-        await dispatch(getDeployments(project?.id!));
-      }
-
-      // Stop polling if we've reached a terminal state
+      // Handle terminal states
       if (
         TERMINAL_STATES.includes(
-          deployment.deploymentStatus as DeploymentStatus
+          deployment?.deploymentStatus as DeploymentStatus
         )
       ) {
+        setHasFetchedTerminalState(true);
         stopPolling();
       }
     } catch (error) {
       console.error("Failed to fetch build logs:", error);
+      stopPolling(); // Stop polling on error to prevent infinite failed requests
     } finally {
       setIsLoading(false);
     }
@@ -94,21 +98,29 @@ export const useDeploymentDetails = (deploymentId: string) => {
   useEffect(() => {
     if (!deployment?.id) return;
 
-    const isTerminalState = TERMINAL_STATES.includes(
-      deployment.deploymentStatus as DeploymentStatus
-    );
+    const currentStatus = deployment.deploymentStatus as DeploymentStatus;
+    const isTerminalState = TERMINAL_STATES.includes(currentStatus);
 
     if (isTerminalState) {
-      // For terminal states, fetch once and stop polling
-      fetchBuildLogs();
+      if (!hasFetchedTerminalState) {
+        fetchBuildLogs();
+        setHasFetchedTerminalState(true);
+      }
       stopPolling();
     } else {
       // For non-terminal states, start polling
+      setHasFetchedTerminalState(false);
       startPolling();
     }
 
     return () => stopPolling();
   }, [deployment?.id, deployment?.deploymentStatus]);
+
+  // Reset state when deploymentId changes
+  useEffect(() => {
+    setHasFetchedTerminalState(false);
+    stopPolling();
+  }, [deploymentId]);
 
   return {
     project,
@@ -116,6 +128,5 @@ export const useDeploymentDetails = (deploymentId: string) => {
     buildLogs,
     isLoading,
     latestDeployment: deployment,
-    isPolling: !!pollingInterval,
   };
 };

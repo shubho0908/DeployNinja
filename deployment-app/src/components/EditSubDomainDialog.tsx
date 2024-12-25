@@ -65,7 +65,7 @@ const EditSubdomainDialog = ({
         updateProject({
           projectId,
           deploymentId,
-          newSubDomain: subdomain,
+          newSubDomain: subdomain.toLowerCase(),
         })
       );
 

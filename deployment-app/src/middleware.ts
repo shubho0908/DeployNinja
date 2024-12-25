@@ -1,7 +1,7 @@
 import { auth } from "@/auth";
 import { NextRequest, NextResponse } from "next/server";
 
-// Public routes that don't require authentication
+// Public routes that don't require middleware
 const PUBLIC_ROUTES = [
   '/api/git/webhook',
   '/api/deploy',

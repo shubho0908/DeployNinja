@@ -55,7 +55,7 @@ export async function POST(req: NextRequest) {
     console.log("Webhook event", eventType);
 
     if (eventType !== "push") {
-      return NextResponse.json({ status: 200, message: "Not a push event" });
+      return NextResponse.json({ status: 400, message: "Not a push event" });
     }
 
     // Extract repository and branch information

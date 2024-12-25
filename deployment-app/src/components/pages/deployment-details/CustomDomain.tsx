@@ -46,7 +46,7 @@ export function CustomDomainsSection({
 }: CustomDomainsSectionProps) {
   return (
     <AccordionItem
-      disabled={latestDeployment?.deploymentStatus === "IN_PROGRESS"}
+      disabled={latestDeployment?.deploymentStatus !== "READY"}
       value="custom-domains"
       className="border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30"
     >

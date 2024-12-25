@@ -7,7 +7,7 @@ export async function GET() {
   try {
     const session = await auth();
     if (!session?.username) {
-      throw new Error("User not authenticated");
+      throw new Error(await handleApiError("User not authenticated"));
     }
 
     const existingUser = await prisma.user.findUnique({

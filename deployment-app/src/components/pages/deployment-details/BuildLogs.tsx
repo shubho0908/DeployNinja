@@ -46,11 +46,19 @@ export function BuildLogsSection({
           <StatusIcon status={latestDeployment?.deploymentStatus} />
         </div>
       </AccordionTrigger>
-      <AccordionContent className="bg-zinc-50 dark:bg-zinc-900/50">
+      <AccordionContent className="bg-zinc-50 dark:bg-zinc-900/50 max-h-[400px] overflow-y-auto">
         <div className="text-sm font-mono whitespace-pre-wrap space-y-1">
-          {!buildLogs ? (
+          {(buildLogs.length === 0 &&
+            latestDeployment?.deploymentStatus === "READY") ||
+          (buildLogs.length === 0 &&
+            latestDeployment?.deploymentStatus === "IN_PROGRESS") ? (
             <div className="p-4 text-center text-zinc-500 dark:text-zinc-400">
               Please wait, we are fetching your logs...
+            </div>
+          ) : buildLogs.length === 0 &&
+            latestDeployment?.deploymentStatus === "FAILED" ? (
+            <div className="p-4 text-center text-zinc-500 dark:text-zinc-400">
+              Sorry, we couldn't fetch your logs. Please try again later.
             </div>
           ) : (
             buildLogs

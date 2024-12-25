@@ -1,7 +1,6 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Card, CardContent, CardHeader, CardTitle } from "./ui/card";
 import { Trash, GithubIcon, Loader2, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { Project } from "@/types/schemas/Project";
@@ -25,7 +24,9 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
+import { useTheme } from "next-themes";
 
+import { MagicCard } from "@/components/ui/magic-card";
 interface ProjectCardProps {
   project: Project;
 }
@@ -37,6 +38,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const [isDeleting, setIsDeleting] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [latestDeployment, setLatestDeployment] = useState<any>(null);
+  const { theme } = useTheme();
 
   const getProjectIcon = () => {
     switch (project.framework) {
@@ -44,9 +46,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
         return "⚛️";
       case "Next.js":
         return "⚡";
-      case "Vue.js":
+      case "Vue":
         return "💚";
-      case "Angular.js":
+      case "Angular":
         return "🅰️";
       default:
         return "⚛️";
@@ -107,12 +109,17 @@ export function ProjectCard({ project }: ProjectCardProps) {
 
   return (
     <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
-      <Card
-        onClick={handleCardClick}
-        className="bg-card border border-border hover:border-border/80 transition-colors cursor-pointer shadow"
+      <MagicCard
+        gradientSize={180}
+        gradientOpacity={0.3}
+        className="cursor-pointer flex-col items-center justify-center shadow whitespace-nowrap text-4xl w-full"
+        gradientColor={theme === "dark" ? "#262626" : "#D9D9D955"}
       >
-        <CardHeader className="space-y-0 p-4 flex justify-between">
-          <CardTitle className="text-sm font-normal">
+        <div
+          className="space-y-0 p-4 flex justify-between w-full"
+          onClick={handleCardClick}
+        >
+          <div className="text-sm font-normal w-full">
             <div className="flex items-center justify-between">
               <div className="flex items-start gap-2">
                 <span className="text-4xl">{getProjectIcon()}</span>
@@ -124,12 +131,18 @@ export function ProjectCard({ project }: ProjectCardProps) {
                     <Skeleton className="h-4 w-48 mt-1" />
                   ) : (
                     <Link
-                      href={`http://${project.subDomain}.localhost:8000`}
+                      href={
+                        latestDeployment?.deploymentStatus !== "READY"
+                          ? "#"
+                          : `http://${project.subDomain}.localhost:8000`
+                      }
                       target="_blank"
                       onClick={(e) => e.stopPropagation()}
                       className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                     >
-                      {project.subDomain}.localhost:8000
+                      {latestDeployment?.deploymentStatus !== "READY"
+                        ? "Deployment Failed"
+                        : `${project.subDomain}.localhost:8000`}
                     </Link>
                   )}
                 </div>
@@ -193,9 +206,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
                 </AlertDialog>
               </div>
             </div>
-          </CardTitle>
-        </CardHeader>
-        <CardContent className="p-4 pt-0">
+          </div>
+        </div>
+        <div className="p-4 pt-0">
           <div className="flex items-start flex-col gap-2 text-sm text-muted-foreground">
             {isLoading ? (
               <Skeleton className="h-8 w-64" />
@@ -242,8 +255,8 @@ export function ProjectCard({ project }: ProjectCardProps) {
               </>
             )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
+      </MagicCard>
     </motion.div>
   );
 }

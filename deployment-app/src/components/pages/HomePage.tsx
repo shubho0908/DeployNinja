@@ -16,6 +16,8 @@ import Link from "next/link";
 import { useSession } from "next-auth/react";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import AnimatedShinyText from "@/components/ui/animated-shiny-text";
+import { cn } from "@/lib/utils";
 
 const container = {
   hidden: { opacity: 0 },
@@ -115,13 +117,21 @@ export default function Home() {
                 stiffness: 100,
               }}
             >
-              <span className="px-4 py-2 rounded-full bg-primary/10 text-primary inline-flex items-center gap-2 mb-6">
-                <Code className="h-4 w-4" />
-                Modern Deployment Platform
-              </span>
+              <div className="z-10 flex items-center justify-center">
+                <div
+                  className={cn(
+                    "group rounded-full border border-black/5 bg-neutral-100 text-base text-white transition-all ease-in hover:cursor-pointer hover:bg-neutral-200 dark:border-white/5 dark:bg-neutral-900 dark:hover:bg-neutral-800"
+                  )}
+                >
+                  <AnimatedShinyText className="inline-flex items-center justify-center px-4 py-1 transition ease-out hover:text-neutral-600 hover:duration-300 hover:dark:text-neutral-400">
+                    <Rocket className="h-4 w-4 mr-2" />
+                    Modern Deployment Platform
+                  </AnimatedShinyText>
+                </div>
+              </div>
             </motion.div>
 
-            <h1 className="text-6xl font-bold mb-6 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
+            <h1 className="text-6xl font-bold my-6 bg-clip-text text-transparent bg-gradient-to-r from-primary to-primary/60">
               Deploy Your Projects with Confidence
             </h1>
             <p className="text-xl text-muted-foreground mb-8">

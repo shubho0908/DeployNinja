@@ -2,33 +2,10 @@ import { NextResponse, NextRequest } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { ProjectModel } from "@/types/schemas/Project";
 import { generateSlug } from "random-word-slugs";
-import {
-  S3Client,
-  DeleteObjectsCommand,
-  ListObjectsV2Command,
-  CopyObjectCommand,
-} from "@aws-sdk/client-s3";
 import { Octokit } from "@octokit/rest";
 import { auth } from "@/auth";
 import { handleApiError } from "@/redux/api/util";
-
-// Check if required environment variables are defined
-if (
-  !process.env.AWS_REGION ||
-  !process.env.AWS_ACCESS_KEY_ID ||
-  !process.env.AWS_SECRET_ACCESS_KEY ||
-  !process.env.AWS_S3_BUCKET_NAME
-) {
-  throw new Error("Missing required AWS credentials in environment variables");
-}
-
-const s3Client = new S3Client({
-  region: process.env.AWS_REGION,
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID,
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY,
-  },
-});
+import { copyFolder, deleteFolder } from "./s3BucketOperations";
 
 // GET route to get all projects — Dashboard
 export async function GET(req: NextRequest) {
@@ -130,58 +107,6 @@ export async function PATCH(req: NextRequest) {
     const oldPrefix = `__outputs/${oldSubDomain}/`;
     const newPrefix = `__outputs/${newSubDomain}/`;
 
-    // Copy all objects with new prefix
-    async function copyFolder(
-      bucketName: string,
-      sourcePrefix: string,
-      targetPrefix: string
-    ) {
-      let isTruncated = true;
-      let continuationToken: string | undefined;
-
-      while (isTruncated) {
-        const listParams = {
-          Bucket: bucketName,
-          Prefix: sourcePrefix,
-          ContinuationToken: continuationToken,
-        };
-
-        const listedObjects = await s3Client.send(
-          new ListObjectsV2Command(listParams)
-        );
-
-        if (listedObjects.Contents?.length) {
-          // Copy each object with new prefix
-          for (const object of listedObjects.Contents) {
-            if (!object.Key) continue;
-
-            const newKey = object.Key.replace(sourcePrefix, targetPrefix);
-            await s3Client.send(
-              new CopyObjectCommand({
-                Bucket: bucketName,
-                CopySource: `${bucketName}/${object.Key}`,
-                Key: newKey,
-              })
-            );
-          }
-
-          // Delete old objects
-          const deleteParams = {
-            Bucket: bucketName,
-            Delete: {
-              Objects: listedObjects.Contents.map((item) => ({
-                Key: item.Key,
-              })),
-            },
-          };
-          await s3Client.send(new DeleteObjectsCommand(deleteParams));
-        }
-
-        isTruncated = listedObjects.IsTruncated || false;
-        continuationToken = listedObjects.NextContinuationToken;
-      }
-    }
-
     // Perform the folder rename operation
     await copyFolder(process.env.AWS_S3_BUCKET_NAME!, oldPrefix, newPrefix);
 
@@ -269,38 +194,6 @@ export async function DELETE(req: NextRequest) {
     // Delete deployments and project
     await prisma.deployment.deleteMany({ where: { projectId } });
     await prisma.project.delete({ where: { id: projectId } });
-
-    // Function to delete all objects under the S3 prefix
-    async function deleteFolder(bucketName: string, prefix: string) {
-      let isTruncated = true;
-      let continuationToken: string | undefined;
-
-      while (isTruncated) {
-        const listParams: any = {
-          Bucket: bucketName,
-          Prefix: prefix,
-          ContinuationToken: continuationToken,
-        };
-        const listedObjects = await s3Client.send(
-          new ListObjectsV2Command(listParams)
-        );
-
-        if (listedObjects.Contents?.length) {
-          const deleteParams = {
-            Bucket: bucketName,
-            Delete: {
-              Objects: listedObjects.Contents.map((item) => ({
-                Key: item.Key,
-              })),
-            },
-          };
-          await s3Client.send(new DeleteObjectsCommand(deleteParams));
-        }
-
-        isTruncated = listedObjects.IsTruncated || false;
-        continuationToken = listedObjects.NextContinuationToken;
-      }
-    }
 
     // Delete folder from S3
     await deleteFolder(process.env.AWS_S3_BUCKET_NAME!, folderPrefix);

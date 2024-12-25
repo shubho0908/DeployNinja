@@ -167,6 +167,7 @@ async function InitializeScript() {
 
           console.log("Upload complete...");
           await publishLog("Upload complete...");
+          await publishLog("Finalizing some changes...");
           resolve();
         } catch (error) {
           console.error("Error in build process:", error);

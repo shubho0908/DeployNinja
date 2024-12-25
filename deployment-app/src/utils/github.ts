@@ -141,7 +141,7 @@ export async function fetchGitUserRepositories(
 
     while (true) {
       const { data } = await octokit.request("GET /user/repos", {
-        type: "all",
+        type: "public",
         sort: "updated",
         direction: "desc",
         per_page: 100,

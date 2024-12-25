@@ -2,11 +2,13 @@
 
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
-import { Plus } from "lucide-react";
+import { Plus, Rocket } from "lucide-react";
 import Link from "next/link";
 import { ProjectCard } from "@/components/project-card";
 import { useSelector } from "react-redux";
 import { RootState } from "@/app/store";
+import BlurFade from "@/components/ui/blur-fade";
+import BlurIn from "@/components/ui/blur-in";
 
 export default function ProjectsPage() {
   const { user } = useSelector((state: RootState) => state.user);
@@ -16,13 +18,20 @@ export default function ProjectsPage() {
     <div className="min-h-screen p-8">
       <div className="max-w-7xl relative top-16 mx-auto">
         <div className="flex justify-between items-center mb-8">
-          <h1 className="text-3xl font-bold">{user?.name}'s Projects</h1>
-          <Button asChild className="bg-primary text-primary-foreground">
-            <Link href="/projects/create">
-              <Plus className="h-4 w-4" />
-              New Project
-            </Link>
-          </Button>
+          <h1 className="font-bold">
+            <BlurIn
+              word={`${user?.name}'s Projects`}
+              className="text-4xl font-bold text-black dark:text-white"
+            />
+          </h1>
+          <BlurFade key="BUTTON" delay={0.25 + 1 * 0.05} inView>
+            <Button asChild className="bg-primary text-primary-foreground">
+              <Link href="/projects/create">
+                <Rocket className="h-4 w-4" />
+                New Project
+              </Link>
+            </Button>
+          </BlurFade>
         </div>
 
         <motion.div
@@ -44,8 +53,10 @@ export default function ProjectsPage() {
               </p>
             </motion.div>
           ) : (
-            projects?.map((project) => (
-              <ProjectCard key={project.id} project={project} />
+            projects?.map((project, idx) => (
+              <BlurFade key={idx} delay={0.25 + idx * 0.05} inView>
+                <ProjectCard key={project.id} project={project} />
+              </BlurFade>
             ))
           )}
         </motion.div>
