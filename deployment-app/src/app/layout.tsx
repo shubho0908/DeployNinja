@@ -1,11 +1,12 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Geist } from "next/font/google";
 import "./globals.css";
 import SessionWrapper from "@/lib/SessionWrapper";
 import { ThemeProvider } from "@/utils/theme-provider";
 import { ReduxProvider } from "../redux/ReduxProvider";
 import { Toaster } from "@/components/ui/sonner";
 import { Navbar } from "@/components/navbar";
+import { DotBackground } from "@/components/ui/background";
 
 const geistSans = Geist({
   subsets: ["latin"],
@@ -35,6 +36,7 @@ export default function RootLayout({
             >
               <Navbar />
               {children}
+              <DotBackground />
             </ThemeProvider>
           </SessionWrapper>
         </body>

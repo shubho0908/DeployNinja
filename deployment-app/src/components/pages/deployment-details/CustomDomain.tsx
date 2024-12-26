@@ -15,50 +15,37 @@ import {
 import EditSubdomainDialog from "@/components/EditSubDomainDialog";
 import { Project } from "@/types/schemas/Project";
 import { DeploymentModel } from "@/types/schemas/Deployment";
-import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
+import { StatusIcon } from "./BuildLogs";
 
 interface CustomDomainsSectionProps {
+  isLoading: boolean;
   project?: Project | null;
   latestDeployment: DeploymentModel | null;
   onSuccess: () => void;
 }
 
-const StatusIcon = ({
-  status,
-}: {
-  status?: DeploymentStatus;
-}) => (
-  <div className="flex items-center gap-2 mr-1">
-    {status === "IN_PROGRESS" ? (
-      <Loader2 className="h-5 w-5 animate-spin text-blue-500" />
-    ) : status === "FAILED" ? (
-      <OctagonXIcon className="h-5 w-5 text-red-500" />
-    ) : (
-      <CheckCircle2 className="h-5 w-5 text-blue-500" />
-    )}
-  </div>
-);
-
 export function CustomDomainsSection({
+  isLoading,
   project,
   latestDeployment,
   onSuccess,
 }: CustomDomainsSectionProps) {
   return (
     <AccordionItem
-      disabled={latestDeployment?.deploymentStatus !== "READY"}
+      disabled={latestDeployment?.deploymentStatus !== "READY" || isLoading}
       value="custom-domains"
-      className="border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/30"
+      className="border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/70 backdrop:blur-lg"
     >
       <AccordionTrigger className="px-4 hover:no-underline border-b hover:bg-zinc-100 dark:hover:bg-zinc-900/50">
         <div className="flex justify-between items-center w-full">
           <span>Assigning Custom Domains</span>
           <StatusIcon
+            isLoading={isLoading}
             status={latestDeployment?.deploymentStatus}
           />
         </div>
       </AccordionTrigger>
-      <AccordionContent className="bg-zinc-50 dark:bg-zinc-900/50 p-4">
+      <AccordionContent className="bg-zinc-50 dark:bg-black/40 p-4">
         <div className="space-y-2 flex items-center justify-between">
           <div className="domains">
             <div className="flex items-center justify-between rounded-md">

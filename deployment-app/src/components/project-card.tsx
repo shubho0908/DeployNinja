@@ -25,8 +25,11 @@ import {
   AlertDialogTrigger,
 } from "@/components/ui/alert-dialog";
 import { useTheme } from "next-themes";
-
 import { MagicCard } from "@/components/ui/magic-card";
+import { FaReact, FaAngular } from "react-icons/fa";
+import { RiNextjsFill } from "react-icons/ri";
+import { IoLogoVue } from "react-icons/io5";
+
 interface ProjectCardProps {
   project: Project;
 }
@@ -43,15 +46,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
   const getProjectIcon = () => {
     switch (project.framework) {
       case "React":
-        return "⚛️";
+        return <FaReact className="w-15 h-15 text-blue-500" />;
       case "Next.js":
-        return "⚡";
+        return <RiNextjsFill className="w-15 h-15 text-foreground" />;
       case "Vue":
-        return "💚";
+        return <IoLogoVue className="w-15 h-15 text-green-500" />;
       case "Angular":
-        return "🅰️";
+        return <FaAngular className="w-15 h-15 text-red-600/80" />;
       default:
-        return "⚛️";
+        return <FaReact className="w-15 h-15 text-blue-500" />;
     }
   };
 
@@ -108,156 +111,166 @@ export function ProjectCard({ project }: ProjectCardProps) {
   };
 
   return (
-    <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
-      <MagicCard
-        gradientSize={180}
-        gradientOpacity={0.3}
-        className="cursor-pointer flex-col items-center justify-center shadow whitespace-nowrap text-4xl w-full"
-        gradientColor={theme === "dark" ? "#262626" : "#D9D9D955"}
-      >
-        <div
-          className="space-y-0 p-4 flex justify-between w-full"
-          onClick={handleCardClick}
+    <>
+      <motion.div whileHover={{ y: -5 }} transition={{ duration: 0.2 }}>
+        <MagicCard
+          gradientSize={180}
+          gradientOpacity={0.5}
+          className="cursor-pointer flex-col items-center justify-center shadow whitespace-nowrap text-4xl w-full"
+          gradientColor={theme === "dark" ? "#262626" : "#D9D9D955"}
         >
-          <div className="text-sm font-normal w-full">
-            <div className="flex items-center justify-between">
-              <div className="flex items-start gap-2">
-                <span className="text-4xl">{getProjectIcon()}</span>
-                <div className="flex flex-col">
-                  <span className="text-foreground font-medium text-lg">
-                    {project.name}
-                  </span>
-                  {isLoading ? (
-                    <Skeleton className="h-4 w-48 mt-1" />
-                  ) : (
-                    <Link
-                      href={
-                        latestDeployment?.deploymentStatus !== "READY"
-                          ? "#"
-                          : `http://${project.subDomain}.localhost:8000`
-                      }
-                      target="_blank"
-                      onClick={(e) => e.stopPropagation()}
-                      className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
-                    >
-                      {latestDeployment?.deploymentStatus !== "READY"
-                        ? "Deployment Failed"
-                        : `${project.subDomain}.localhost:8000`}
-                    </Link>
-                  )}
-                </div>
-              </div>
-              <div className="flex items-center gap-2">
-                <AlertDialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-                  <AlertDialogTrigger asChild>
-                    <Button
-                      size="icon"
-                      variant="destructive"
-                      onClick={handleDeleteClick}
-                      disabled={isDeleting}
-                    >
-                      {isDeleting ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Trash className="h-4 w-4" />
-                      )}
-                    </Button>
-                  </AlertDialogTrigger>
-                  <AlertDialogContent
-                    onOpenAutoFocus={(e) => e.preventDefault()}
-                    onClick={(e: React.MouseEvent) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                    }}
-                  >
-                    <AlertDialogHeader>
-                      <AlertDialogTitle>Delete Project</AlertDialogTitle>
-                      <AlertDialogDescription>
-                        Are you sure you want to delete {project.name}? This
-                        action cannot be undone.
-                      </AlertDialogDescription>
-                    </AlertDialogHeader>
-                    <AlertDialogFooter>
-                      <AlertDialogCancel
-                        onClick={(e) => {
-                          e.preventDefault();
-                          e.stopPropagation();
-                          setIsDialogOpen(false);
-                        }}
-                        disabled={isDeleting}
+          <div
+            className="space-y-0 p-4 flex justify-between w-full"
+            onClick={handleCardClick}
+          >
+            <div className="text-sm font-normal w-full">
+              <div className="flex items-center justify-between">
+                <div className="flex items-start gap-2">
+                  <span className="text-4xl">{getProjectIcon()}</span>
+                  <div className="flex flex-col">
+                    <span className="text-foreground font-medium text-lg">
+                      {project.name}
+                    </span>
+                    {isLoading ? (
+                      <Skeleton className="h-4 w-48 mt-1" />
+                    ) : (
+                      <Link
+                        href={
+                          latestDeployment?.deploymentStatus === "READY"
+                            ? `http://${project.subDomain}.localhost:8000`
+                            : "#"
+                        }
+                        target="_blank"
+                        onClick={(e) => e.stopPropagation()}
+                        className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
                       >
-                        Cancel
-                      </AlertDialogCancel>
-                      <AlertDialogAction
-                        onClick={handleProjectDeletion}
+                        {latestDeployment?.deploymentStatus === "READY"
+                          ? project.subDomain.length > 5
+                            ? `${project.subDomain.slice(
+                                0,
+                                5
+                              )}...localhost:8000`
+                            : `${project.subDomain}.localhost:8000`
+                          : "Deployment Failed"}
+                      </Link>
+                    )}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  <AlertDialog
+                    open={isDialogOpen}
+                    onOpenChange={setIsDialogOpen}
+                  >
+                    <AlertDialogTrigger asChild>
+                      <Button
+                        size="icon"
+                        variant="destructive"
+                        onClick={handleDeleteClick}
                         disabled={isDeleting}
                       >
                         {isDeleting ? (
-                          <>
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                            Deleting...
-                          </>
+                          <Loader2 className="h-4 w-4 animate-spin" />
                         ) : (
-                          "Delete"
+                          <Trash className="h-4 w-4" />
                         )}
-                      </AlertDialogAction>
-                    </AlertDialogFooter>
-                  </AlertDialogContent>
-                </AlertDialog>
+                      </Button>
+                    </AlertDialogTrigger>
+                    <AlertDialogContent
+                      onOpenAutoFocus={(e) => e.preventDefault()}
+                      onClick={(e: React.MouseEvent) => {
+                        e.preventDefault();
+                        e.stopPropagation();
+                      }}
+                    >
+                      <AlertDialogHeader>
+                        <AlertDialogTitle>Delete Project</AlertDialogTitle>
+                        <AlertDialogDescription>
+                          Are you sure you want to delete {project.name}? This
+                          action cannot be undone.
+                        </AlertDialogDescription>
+                      </AlertDialogHeader>
+                      <AlertDialogFooter>
+                        <AlertDialogCancel
+                          onClick={(e) => {
+                            e.preventDefault();
+                            e.stopPropagation();
+                            setIsDialogOpen(false);
+                          }}
+                          disabled={isDeleting}
+                        >
+                          Cancel
+                        </AlertDialogCancel>
+                        <AlertDialogAction
+                          onClick={handleProjectDeletion}
+                          disabled={isDeleting}
+                        >
+                          {isDeleting ? (
+                            <>
+                              <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              Deleting...
+                            </>
+                          ) : (
+                            "Delete"
+                          )}
+                        </AlertDialogAction>
+                      </AlertDialogFooter>
+                    </AlertDialogContent>
+                  </AlertDialog>
+                </div>
               </div>
             </div>
           </div>
-        </div>
-        <div className="p-4 pt-0">
-          <div className="flex items-start flex-col gap-2 text-sm text-muted-foreground">
+          <div className="p-4 pt-0">
+            <div className="flex items-start flex-col gap-2 text-sm text-muted-foreground">
+              {isLoading ? (
+                <Skeleton className="h-8 w-64" />
+              ) : (
+                <Link
+                  href={project.gitRepoUrl}
+                  target="_blank"
+                  onClick={(e) => e.stopPropagation()}
+                  className="flex relative z-10 items-center gap-2 px-3 py-1 rounded-full dark:text-white text-black dark:bg-gray-800/70 bg-gray-200 hover:text-foreground transition-colors"
+                >
+                  <GithubIcon className="w-4" />
+                  <span>
+                    {new URL(project.gitRepoUrl).pathname.split("/")[1]}/
+                    {new URL(project.gitRepoUrl).pathname.split("/")[2]}
+                  </span>
+                </Link>
+              )}
+            </div>
             {isLoading ? (
-              <Skeleton className="h-8 w-64" />
+              <Skeleton className="h-4 w-40 mt-3 ml-1" />
             ) : (
-              <Link
-                href={project.gitRepoUrl}
-                target="_blank"
-                onClick={(e) => e.stopPropagation()}
-                className="flex relative z-10 items-center gap-2 px-3 py-1 rounded-full dark:text-white text-black dark:bg-gray-800/70 bg-gray-200 hover:text-foreground transition-colors"
-              >
-                <GithubIcon className="w-4" />
-                <span>
-                  {new URL(project.gitRepoUrl).pathname.split("/")[1]}/
-                  {new URL(project.gitRepoUrl).pathname.split("/")[2]}
-                </span>
-              </Link>
+              <p className="text-sm text-muted-foreground mt-3 ml-1">
+                Created{" "}
+                {project?.createdAt &&
+                  formatDistanceToNow(new Date(project.createdAt))}{" "}
+                ago
+              </p>
             )}
+            <div className="flex items-end gap-2">
+              {isLoading ? (
+                <>
+                  <Skeleton className="h-4 w-24 mt-3 ml-1" />
+                  <Skeleton className="h-4 w-32" />
+                </>
+              ) : (
+                <>
+                  <p className="text-sm text-muted-foreground mt-3 ml-1">
+                    {latestDeployment?.gitCommitHash?.slice(0, 7)}
+                  </p>
+                  <span className="flex items-center gap-2 text-sm">
+                    <GitBranch className="w-4 text-primary" />
+                    {latestDeployment?.gitBranchName}
+                  </span>
+                </>
+              )}
+            </div>
           </div>
-          {isLoading ? (
-            <Skeleton className="h-4 w-40 mt-3 ml-1" />
-          ) : (
-            <p className="text-sm text-muted-foreground mt-3 ml-1">
-              Created{" "}
-              {project?.createdAt &&
-                formatDistanceToNow(new Date(project.createdAt))}{" "}
-              ago
-            </p>
-          )}
-          <div className="flex items-end gap-2">
-            {isLoading ? (
-              <>
-                <Skeleton className="h-4 w-24 mt-3 ml-1" />
-                <Skeleton className="h-4 w-32" />
-              </>
-            ) : (
-              <>
-                <p className="text-sm text-muted-foreground mt-3 ml-1">
-                  {latestDeployment?.gitCommitHash?.slice(0, 7)}
-                </p>
-                <span className="flex items-center gap-2 text-sm">
-                  <GitBranch className="w-4 text-primary" />
-                  {latestDeployment?.gitBranchName}
-                </span>
-              </>
-            )}
-          </div>
-        </div>
-      </MagicCard>
-    </motion.div>
+        </MagicCard>
+      </motion.div>
+    </>
   );
 }
 

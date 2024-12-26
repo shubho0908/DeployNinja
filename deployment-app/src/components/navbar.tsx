@@ -1,10 +1,10 @@
-"use client"
+"use client";
 
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "./ui/theme-toggle";
 import { Button } from "./ui/button";
-import { Github, LogOut } from "lucide-react";
+import { Github, LogOut, User } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
@@ -27,7 +27,7 @@ export function Navbar() {
       animate={{ y: 0 }}
       transition={{ duration: 0.5 }}
     >
-      <div className="container mx-auto px-4 h-16 flex items-center justify-between">
+      <div className="container mx-auto px-4 h-16 flex items-center justify-between bg-white/40 dark:bg-zinc-950/40 backdrop:blur-lg">
         <div className="flex items-start">
           <Link href="/" className="text-2xl font-bold">
             DeployNinja
@@ -58,20 +58,44 @@ export function Navbar() {
                     </Button>
                   </PopoverTrigger>
                   <PopoverContent
-                    className="w-fit relative top-3"
+                    className="w-64 p-4 relative top-3"
                     align="end"
                     sideOffset={5}
-                    asChild
                   >
-                    <div className="">
-                      <Button
-                        variant="ghost"
-                        className="flex items-center justify-start w-full"
-                        onClick={() => signOut()}
-                      >
-                        <LogOut className="mr-2 h-4 w-4" />
-                        Logout
-                      </Button>
+                    <div className="flex flex-col space-y-4">
+                      <div className="flex items-center space-x-4">
+                        <Image
+                          src={session.user?.image ?? "/default-avatar.png"}
+                          alt={session.user?.name ?? "User avatar"}
+                          width={48}
+                          height={48}
+                          className="rounded-full"
+                          priority
+                        />
+                        <div className="flex flex-col">
+                          <span className="font-medium">
+                            {session.user?.name ?? "User"}
+                          </span>
+                          <Link 
+                            href={`https://github.com/${session?.username}`}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-sm text-muted-foreground hover:text-primary"
+                          >
+                            @{session?.username}
+                          </Link>
+                        </div>
+                      </div>
+                      <div className="border-t pt-4">
+                        <Button
+                          variant="destructive"
+                          className="w-full justify-start text-white"
+                          onClick={() => signOut()}
+                        >
+                          <LogOut className="mr-2 h-4 w-4 text-white" />
+                          Logout
+                        </Button>
+                      </div>
                     </div>
                   </PopoverContent>
                 </Popover>
