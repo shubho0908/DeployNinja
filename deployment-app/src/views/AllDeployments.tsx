@@ -6,13 +6,13 @@ import { RootState } from "@/app/store";
 import { useSelector } from "react-redux";
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Button } from "../ui/button";
+import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { formatTimeAgo } from "@/utils/formatDate";
 import { Geist_Mono } from "next/font/google";
-import BlurFade from "../ui/blur-fade";
+import BlurFade from "@/components/ui/blur-fade";
 import BlurIn from "@/components/ui/blur-in";
-import { DeploymentNotFound } from "./deployment-details/DeploymentDetails";
+import { DeploymentNotFound } from "./DeploymentDetails";
 import { DeploymentModel } from "@/types/schemas/Deployment";
 
 const geistMono = Geist_Mono({
@@ -47,7 +47,7 @@ function DeploymentSkeleton() {
 
 export default function AllDeployments() {
   const searchParams = useSearchParams();
-  const projectId = searchParams.get("id");
+  const projectId = searchParams?.get("id");
   const { projects } = useSelector((state: RootState) => state.projects);
   const { user } = useSelector((state: RootState) => state.user);
   const [isLoading, setIsLoading] = useState(true);

@@ -1,7 +1,7 @@
 "use client";
 
 import withAuthRequired from "@/utils/withAuthRequired";
-import AllDeployments from "@/components/pages/AllDeployments";
+import AllDeployments from "@/views/AllDeployments";
 
 function AllDeploymentsWrapper() {
   return (

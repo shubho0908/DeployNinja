@@ -1,6 +1,6 @@
 "use client";
 
-import ProjectCardPage from "@/components/pages/create-project/CreateProjectCard";
+import ProjectCardPage from "@/views/CreateProjectCard";
 import withAuthRequired from "@/utils/withAuthRequired";
 
 function CreateProjectCardWrapper() {

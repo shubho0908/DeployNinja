@@ -32,7 +32,12 @@ import {
   AccordionTrigger,
 } from "@/components/ui/accordion";
 import { frameworks, container, item } from "@/utils/constants";
-import { useCreateProject } from "./CreateProject";
+import { Geist_Mono } from "next/font/google";
+import { useCreateProject } from "@/components/create-project/CreateProject";
+
+const geistMono = Geist_Mono({
+  subsets: ["latin"],
+});
 
 export default function CreateProjectCard() {
   const { state, updateState, handleSubmit } = useCreateProject();
@@ -211,7 +216,7 @@ export default function CreateProjectCard() {
                               onChange={(e) =>
                                 updateState({ installCommand: e.target.value })
                               }
-                              className="font-mono text-sm"
+                              className={`${geistMono.className} text-sm my-1`}
                             />
                           </div>
                           <div>
@@ -223,7 +228,7 @@ export default function CreateProjectCard() {
                               onChange={(e) =>
                                 updateState({ buildCommand: e.target.value })
                               }
-                              className="font-mono text-sm"
+                              className={`${geistMono.className} text-sm my-1`}
                             />
                           </div>
                           <div>
@@ -237,7 +242,7 @@ export default function CreateProjectCard() {
                               onChange={(e) =>
                                 updateState({ projectRootDir: e.target.value })
                               }
-                              className="font-mono text-sm"
+                              className={`${geistMono.className} text-sm my-1`}
                             />
                           </div>
                         </div>
@@ -266,7 +271,7 @@ export default function CreateProjectCard() {
                                 onChange={(e) =>
                                   updateEnvVar(index, "key", e.target.value)
                                 }
-                                className="font-mono text-sm"
+                                className={`${geistMono.className} text-sm my-1`}
                               />
                               <Input
                                 placeholder="VALUE"
@@ -274,7 +279,7 @@ export default function CreateProjectCard() {
                                 onChange={(e) =>
                                   updateEnvVar(index, "value", e.target.value)
                                 }
-                                className="font-mono text-sm"
+                                className={`${geistMono.className} text-sm my-1`}
                               />
                               <Button
                                 variant="ghost"
