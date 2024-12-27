@@ -12,7 +12,7 @@ import {
   AccordionItem,
   AccordionTrigger,
 } from "@/components/ui/accordion";
-import EditSubdomainDialog from "@/components/EditSubDomainDialog";
+import EditSubdomainDialog from "@/components/pages/deployment-details/EditSubDomainDialog";
 import { Project } from "@/types/schemas/Project";
 import { DeploymentModel } from "@/types/schemas/Deployment";
 import { StatusIcon } from "./BuildLogs";

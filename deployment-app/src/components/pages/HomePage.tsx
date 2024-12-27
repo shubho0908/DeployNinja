@@ -18,7 +18,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import AnimatedShinyText from "@/components/ui/animated-shiny-text";
 import { cn } from "@/lib/utils";
-import NumberTicker from "@/components/ui/number-ticker";
 
 const container = {
   hidden: { opacity: 0 },
@@ -66,8 +65,8 @@ export default function Home() {
     },
     {
       icon: <Zap className="h-6 w-6" />,
-      title: "Continuous Integration & Deployment",
-      description: "Automate your deployment process with our services",
+      title: "Real-time Analytics",
+      description: "Monitor your application's performance in real-time",
     },
   ];
 
@@ -90,9 +89,9 @@ export default function Home() {
   ];
 
   const stats = [
-    { value: 99.9, label: "Uptime" },
-    { value: 10.2, label: "Avg. Deploy Time" },
-    { value: 75, label: "Global Latency" },
+    { value: "99.9%", label: "Uptime" },
+    { value: "2.1s", label: "Avg. Deploy Time" },
+    { value: "50ms", label: "Global Latency" },
   ];
 
   if (loading || session) {
@@ -227,15 +226,7 @@ export default function Home() {
                     transition={{ delay: index * 0.1 }}
                     className="text-center"
                   >
-                    <div className="text-4xl font-bold mb-2">
-                      <span>
-                        <NumberTicker
-                          value={stat.value}
-                          decimalPlaces={index === 2 ? 0 : 1}
-                        />
-                        {index === 0 ? "%" : index === 1 ? "s" : "ms"}
-                      </span>
-                    </div>
+                    <div className="text-4xl font-bold mb-2">{stat.value}</div>
                     <div className="text-muted-foreground">{stat.label}</div>
                   </motion.div>
                 ))}

@@ -4,7 +4,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import { ThemeToggle } from "./ui/theme-toggle";
 import { Button } from "./ui/button";
-import { Github, LogOut, Rocket, User } from "lucide-react";
+import { Github, LogOut, User } from "lucide-react";
 import { usePathname } from "next/navigation";
 import { useSession, signOut } from "next-auth/react";
 import Image from "next/image";
@@ -29,8 +29,7 @@ export function Navbar() {
     >
       <div className="container mx-auto px-4 h-16 flex items-center justify-between bg-white/40 dark:bg-zinc-950/40 backdrop:blur-lg">
         <div className="flex items-start">
-          <Link href="/" className="text-2xl font-bold flex items-center gap-2">
-            <Rocket className="h-6 w-6" />
+          <Link href="/" className="text-2xl font-bold">
             DeployNinja
           </Link>
         </div>
@@ -77,7 +76,7 @@ export function Navbar() {
                           <span className="font-medium">
                             {session.user?.name ?? "User"}
                           </span>
-                          <Link
+                          <Link 
                             href={`https://github.com/${session?.username}`}
                             target="_blank"
                             rel="noopener noreferrer"

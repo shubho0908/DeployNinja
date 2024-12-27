@@ -17,7 +17,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import ProjectGrid from "@/components/project/ProjectGrid";
+import ProjectGrid from "./ProjectGrid";
 import { FaReact, FaAngular } from "react-icons/fa";
 import { RiNextjsFill } from "react-icons/ri";
 import { IoLogoVue } from "react-icons/io5";

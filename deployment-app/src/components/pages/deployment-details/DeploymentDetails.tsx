@@ -6,56 +6,32 @@ import { ChevronLeft, Copy, ExternalLink, Github } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Accordion } from "@/components/ui/accordion";
 import { Skeleton } from "@/components/ui/skeleton";
-import { BuildLogsSection } from "@/components/deployment-details/BuildLogs";
-import { CustomDomainsSection } from "@/components/deployment-details/CustomDomain";
+import { BuildLogsSection } from "./BuildLogs";
+import { CustomDomainsSection } from "./CustomDomain";
 import { getProjects } from "@/redux/api/projectApi";
-import { useDeploymentDetails } from "@/components/deployment-details/useDeploymentDetails";
+import { useDeploymentDetails } from "./useDeploymentDetails";
 import { useAppDispatch } from "@/redux/hooks";
-import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
-import { toast } from "sonner";
-import { Project } from "@/types/schemas/Project";
-import { RiNextjsFill } from "react-icons/ri";
-import { IoLogoVue } from "react-icons/io5";
-import { FaAngular, FaReact } from "react-icons/fa";
-import { MdOutlineCloudOff } from "react-icons/md";
-import BlurFade from "@/components/ui/blur-fade";
 import { useEffect, useState } from "react";
+import { Project } from "@/types/schemas/Project";
+import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
+import { PreviewSection } from "./PreviewSection";
+import { DeploymentNotFound } from "./DeploymentNotFound";
+import { toast } from "sonner";
 
 // Types
-type StatusColors = {
-  [key in DeploymentStatus]: string;
-};
-
 type LoadingState = {
   isLoading: boolean;
   hasError: boolean;
   isInitialized: boolean;
 };
 
+// Utility function for clipboard
 const handleCopyUrl = (domain: string) => {
   navigator.clipboard.writeText(`http://${domain}`);
   toast.success("Copied to clipboard");
 };
 
-// Components
-const StatusIndicator = ({ status }: { status: DeploymentStatus }) => {
-  const statusColors: StatusColors = {
-    READY: "bg-green-500",
-    FAILED: "bg-red-500",
-    IN_PROGRESS: "bg-yellow-500",
-    NOT_STARTED: "bg-gray-500",
-  };
-
-  return (
-    <div className="flex items-center gap-2">
-      <span className={`w-2 h-2 rounded-full ${statusColors[status]}`} />
-      <span className="text-sm">
-        {status === "IN_PROGRESS" ? "IN PROGRESS" : status}
-      </span>
-    </div>
-  );
-};
-
+// Small components
 const DetailItem = ({
   label,
   value,
@@ -71,42 +47,20 @@ const DetailItem = ({
   </div>
 );
 
-const PreviewSection = ({
-  project,
-  deploymentStatus,
-  isLoading,
-}: {
-  project: Project;
-  deploymentStatus?: DeploymentStatus;
-  isLoading: boolean;
-}) => {
-  if (isLoading) {
-    return <Skeleton className="w-full h-64 rounded" />;
-  }
-
-  if (!project?.subDomain) {
-    return null;
-  }
-
-  const FrameworkIcon = {
-    "Next.js": () => <RiNextjsFill className="h-14 w-14 text-foreground" />,
-    Vue: () => <IoLogoVue className="h-14 w-14 text-green-500" />,
-    Angular: () => <FaAngular className="h-14 w-14 text-red-600/80" />,
-    React: () => <FaReact className="h-14 w-14 text-blue-500" />,
-  }[project.framework] || (() => <FaReact className="h-14 w-14 text-blue-500" />);
+const StatusIndicator = ({ status }: { status: DeploymentStatus }) => {
+  const statusColors = {
+    READY: "bg-green-500",
+    FAILED: "bg-red-500",
+    IN_PROGRESS: "bg-yellow-500",
+    NOT_STARTED: "bg-gray-500",
+  };
 
   return (
-    <div className="bg-zinc-50 dark:bg-zinc-900 rounded-md p-8">
-      {deploymentStatus === "IN_PROGRESS" ? (
-        <Skeleton className="w-full h-64 rounded" />
-      ) : (
-        <div className="w-full h-64 rounded flex items-center justify-center">
-          <div className="flex items-center justify-center flex-col gap-2">
-            <FrameworkIcon />
-            <p>Your project is ready! 🎉</p>
-          </div>
-        </div>
-      )}
+    <div className="flex items-center gap-2">
+      <span className={`w-2 h-2 rounded-full ${statusColors[status]}`} />
+      <span className="text-sm">
+        {status === "IN_PROGRESS" ? "IN PROGRESS" : status}
+      </span>
     </div>
   );
 };
@@ -144,40 +98,27 @@ const DomainLink = ({
   );
 };
 
-export const DeploymentNotFound = () => (
-  <BlurFade key="deployment-not-found" delay={0.25 + 0.5 * 0.05} inView>
-    <div className="flex flex-col items-center justify-center p-12 space-y-4 text-center">
-      <div className="w-16 h-16 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
-        <MdOutlineCloudOff className="w-8 h-8 text-zinc-400" />
-      </div>
-      <h3 className="text-xl font-semibold">No Deployment Found</h3>
-      <p className="text-zinc-500 dark:text-zinc-400 max-w-md">
-        This project hasn't been deployed yet. Create your first deployment to
-        get started.
-      </p>
-    </div>
-  </BlurFade>
-);
-
+// Main component
 export default function DeploymentDetails({
   deploymentId,
 }: {
   deploymentId: string;
 }) {
   const dispatch = useAppDispatch();
-  const { project, latestDeployment, buildLogs } = useDeploymentDetails(deploymentId);
+  const { project, latestDeployment, buildLogs } =
+    useDeploymentDetails(deploymentId);
   const [loadingState, setLoadingState] = useState<LoadingState>({
     isLoading: true,
     hasError: false,
-    isInitialized: false
+    isInitialized: false,
   });
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      setLoadingState(prev => ({
+      setLoadingState((prev) => ({
         ...prev,
         isLoading: false,
-        isInitialized: true
+        isInitialized: true,
       }));
     }, 3000);
 
@@ -190,7 +131,7 @@ export default function DeploymentDetails({
     }
   };
 
-  // Show loading state
+  // Loading state
   if (loadingState.isLoading && !loadingState.isInitialized) {
     return (
       <div className="min-h-screen p-8">
@@ -203,7 +144,7 @@ export default function DeploymentDetails({
     );
   }
 
-  // Show deployment not found
+  // No deployment found
   if (!loadingState.isLoading && !latestDeployment) {
     return (
       <div className="min-h-screen p-8">
@@ -220,9 +161,11 @@ export default function DeploymentDetails({
     );
   }
 
+  // Main render
   return (
     <div className="min-h-screen text-zinc-900 dark:text-white p-8">
       <div className="max-w-6xl relative top-16 pb-8 mx-auto space-y-6">
+        {/* Header Navigation */}
         <Link href="/projects">
           <Button variant="secondary">
             <ChevronLeft />
@@ -230,6 +173,7 @@ export default function DeploymentDetails({
           </Button>
         </Link>
 
+        {/* Title and Actions */}
         <div className="flex justify-between items-center">
           <h1 className="text-3xl font-semibold">
             {loadingState.isLoading ? (
@@ -257,16 +201,21 @@ export default function DeploymentDetails({
           </div>
         </div>
 
+        {/* Main Content */}
         <div className="space-y-4">
           <h2 className="text-xl font-semibold">Production Deployment</h2>
+
+          {/* Deployment Info Card */}
           <div className="border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-950 rounded-lg p-6 shadow">
             <div className="grid grid-cols-2 gap-8">
+              {/* Preview Section */}
               <PreviewSection
                 project={project}
                 deploymentStatus={latestDeployment?.deploymentStatus}
                 isLoading={loadingState.isLoading}
               />
 
+              {/* Deployment Details */}
               <div className="space-y-6">
                 <DetailItem
                   label="Deployment ID"
@@ -324,6 +273,7 @@ export default function DeploymentDetails({
             </div>
           </div>
 
+          {/* Additional Sections */}
           <Accordion
             type="multiple"
             className="border border-zinc-200 dark:border-zinc-800 rounded-lg"

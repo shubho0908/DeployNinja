@@ -1,6 +1,6 @@
 "use client";
 
-import LoginPage from "@/views/LoginPage";
+import LoginPage from "@/components/pages/LoginPage";
 
 function LoginWrapper() {
   return <LoginPage />;

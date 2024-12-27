@@ -5,7 +5,7 @@ import { Trash, GithubIcon, Loader2, GitBranch } from "lucide-react";
 import Link from "next/link";
 import { Project } from "@/types/schemas/Project";
 import { useRouter } from "next/navigation";
-import { Button } from "./ui/button";
+import { Button } from "../../ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
 import { handleApiError } from "@/redux/api/util";
 import { useAppDispatch } from "@/redux/hooks";
@@ -26,7 +26,7 @@ import {
 } from "@/components/ui/alert-dialog";
 import { useTheme } from "next-themes";
 import { MagicCard } from "@/components/ui/magic-card";
-import { FaReact, FaAngular, FaGithub } from "react-icons/fa";
+import { FaReact, FaAngular } from "react-icons/fa";
 import { RiNextjsFill } from "react-icons/ri";
 import { IoLogoVue } from "react-icons/io5";
 
@@ -229,9 +229,9 @@ export function ProjectCard({ project }: ProjectCardProps) {
                   href={project.gitRepoUrl}
                   target="_blank"
                   onClick={(e) => e.stopPropagation()}
-                  className="flex relative z-10 items-center gap-2 px-3 py-1 rounded-full dark:text-white text-black dark:bg-zinc-700/70 bg-gray-200 hover:text-foreground transition-colors"
+                  className="flex relative z-10 items-center gap-2 px-3 py-1 rounded-full dark:text-white text-black dark:bg-gray-800/70 bg-gray-200 hover:text-foreground transition-colors"
                 >
-                  <FaGithub className="w-4" />
+                  <GithubIcon className="w-4" />
                   <span>
                     {new URL(project.gitRepoUrl).pathname.split("/")[1]}/
                     {new URL(project.gitRepoUrl).pathname.split("/")[2]}
