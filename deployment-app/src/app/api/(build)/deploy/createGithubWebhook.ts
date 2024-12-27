@@ -1,6 +1,6 @@
 import { prisma } from "@/lib/prisma";
-import { handleApiError } from "@/redux/api/util";
 import { Octokit } from "@octokit/rest";
+import { NextResponse } from "next/server";
 
 export async function createGitHubWebhook(
   projectId: string,
@@ -62,6 +62,14 @@ export async function createGitHubWebhook(
       console.log("Webhook created successfully. ", webhook.data.id);
     }
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create GitHub webhook",
+      },
+      { status: 500 }
+    );
   }
 }

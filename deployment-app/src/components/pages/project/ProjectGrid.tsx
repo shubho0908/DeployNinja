@@ -1,10 +1,11 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { Loader2, Rocket } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import BlurFade from "@/components/ui/blur-fade";
 import { ProjectCard } from "@/components/pages/project/project-card";
 import { useEffect, useState } from "react";
+import { MdSearchOff } from "react-icons/md";
 
 interface ProjectGridProps {
   projects: any[];
@@ -54,8 +55,15 @@ export default function ProjectGrid({
             animate={{ opacity: 1 }}
             transition={{ duration: 0.5 }}
           >
-            <Rocket className="text-6xl text-muted-foreground mb-2" />
-            <p className="text-xl mt-4 text-foreground">Create a new project</p>
+            <div className="w-14 h-14 bg-zinc-100 dark:bg-zinc-800 rounded-full flex items-center justify-center">
+              <MdSearchOff className="w-8 h-8 text-zinc-400" />
+            </div>
+            <p className="mt-4 text-xl font-semibold text-foreground">
+              Projects not found
+            </p>
+            <p className="text-muted-foreground">
+              Create a new project to get started
+            </p>
           </motion.div>
         </div>
       ) : (

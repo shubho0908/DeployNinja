@@ -24,6 +24,7 @@ export default function RootLayout({
 }>) {
   return (
     <html lang="en" className={`${geistSans.className}`}>
+      <link rel="shortcut icon" href="/logo.svg" type="image/x-icon" />
       <ReduxProvider>
         <body className={`${geistSans.className} antialiased`}>
           <Toaster />

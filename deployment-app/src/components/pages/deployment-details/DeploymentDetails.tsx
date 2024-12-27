@@ -17,13 +17,13 @@ import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
 import { PreviewSection } from "./PreviewSection";
 import { DeploymentNotFound } from "./DeploymentNotFound";
 import { toast } from "sonner";
+import confetti from "canvas-confetti";
 
-// Types
-type LoadingState = {
+interface LoadingState {
   isLoading: boolean;
   hasError: boolean;
   isInitialized: boolean;
-};
+}
 
 // Utility function for clipboard
 const handleCopyUrl = (domain: string) => {
@@ -31,7 +31,6 @@ const handleCopyUrl = (domain: string) => {
   toast.success("Copied to clipboard");
 };
 
-// Small components
 const DetailItem = ({
   label,
   value,
@@ -98,7 +97,6 @@ const DomainLink = ({
   );
 };
 
-// Main component
 export default function DeploymentDetails({
   deploymentId,
 }: {

@@ -1,11 +1,12 @@
 import { NextRequest, NextResponse } from "next/server";
-import { API, handleApiError } from "@/redux/api/util";
+import { API } from "@/redux/api/util";
 import { z } from "zod";
 import { DescribeTasksCommand } from "@aws-sdk/client-ecs";
 import { prisma } from "@/lib/prisma";
 import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
 import { ecsClient } from "@/lib/aws";
 import { client } from "@/lib/clickhouse";
+import { auth } from "@/auth";
 
 // Schema for build logs
 export const BuildLogsSchema = z.object({
@@ -31,9 +32,9 @@ export async function GET(req: NextRequest) {
     // First, get the current deployment status
     const deployment = await prisma.deployment.findUnique({
       where: { id: deploymentId },
-      select: { 
+      select: {
         taskArn: true,
-        deploymentStatus: true
+        deploymentStatus: true,
       },
     });
 
@@ -51,15 +52,18 @@ export async function GET(req: NextRequest) {
       await updateDeploymentStatus(deploymentId, deployment.taskArn, rawLogs);
     }
 
-    return NextResponse.json({ 
-      status: 200, 
+    return NextResponse.json({
+      status: 200,
       logs: rawLogs,
-      deploymentStatus: deployment.deploymentStatus
+      deploymentStatus: deployment.deploymentStatus,
     });
   } catch (error) {
     console.error("Failed to fetch build logs:", error);
     return NextResponse.json(
-      { error: "Failed to fetch build logs" },
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to fetch build logs",
+      },
       { status: 500 }
     );
   }
@@ -67,7 +71,7 @@ export async function GET(req: NextRequest) {
 
 // Helper function to check if deployment is in a final state
 function isDeploymentInFinalState(status: DeploymentStatus): boolean {
-  const finalStates: DeploymentStatus[] = ['READY', 'FAILED'];
+  const finalStates: DeploymentStatus[] = ["READY", "FAILED"];
   return finalStates.includes(status);
 }
 
@@ -101,14 +105,19 @@ async function checkECSTaskStatus(taskArn: string): Promise<{
     const task = response.tasks?.[0];
 
     if (!task) {
-      return { 
-        isActive: false, 
+      return {
+        isActive: false,
         isSuccessful: false,
-        error: "Task not found" 
+        error: "Task not found",
       };
     }
 
-    const activeStates = ["PROVISIONING", "PENDING", "RUNNING", "DEPROVISIONING"];
+    const activeStates = [
+      "PROVISIONING",
+      "PENDING",
+      "RUNNING",
+      "DEPROVISIONING",
+    ];
     const isActive = activeStates.includes(task.lastStatus || "");
 
     // Check for successful completion
@@ -124,17 +133,17 @@ async function checkECSTaskStatus(taskArn: string): Promise<{
     return { isActive, isSuccessful };
   } catch (error) {
     console.error("Error checking ECS task status:", error);
-    return { 
-      isActive: false, 
+    return {
+      isActive: false,
       isSuccessful: false,
-      error: "Failed to check task status" 
+      error: "Failed to check task status",
     };
   }
 }
 
 async function updateDeploymentStatus(
-  deploymentId: string, 
-  taskArn: string | null, 
+  deploymentId: string,
+  taskArn: string | null,
   logs: BuildLogs[]
 ) {
   if (!taskArn) {
@@ -169,9 +178,23 @@ async function updateDeploymentStatus(
 
 async function updateStatus(deploymentId: string, status: DeploymentStatus) {
   try {
-    await API.patch(`/deploy?deploymentId=${deploymentId}`, {
-      deploymentStatus: status,
-    });
+    const session = await auth();
+    if (!session?.accessToken) {
+      throw new Error("Authentication required");
+    }
+    await API.patch(
+      `/deploy?deploymentId=${deploymentId}`,
+      {
+        deploymentStatus: status,
+      },
+      {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${session.accessToken}`,
+          "X-Request-Maker": "webhook",
+        },
+      }
+    );
   } catch (error) {
     console.error("Failed to update deployment status:", error);
     throw new Error("Failed to update deployment status");

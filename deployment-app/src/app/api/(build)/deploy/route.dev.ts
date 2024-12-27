@@ -68,7 +68,15 @@ async function createGitHubWebhook(
       console.log("Webhook created successfully. ", webhook.data.id);
     }
   } catch (error) {
-    throw new Error(await handleApiError(error));
+     return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create GitHub webhook",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -100,7 +108,15 @@ async function runDockerDeploymentWithCLI(
 
     console.log("Docker container started successfully.");
   } catch (error) {
-    throw new Error(await handleApiError(error));
+     return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create GitHub webhook",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -119,7 +135,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ status: 200, data: deployments });
   } catch (error) {
-    throw new Error(await handleApiError(error));
+     return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create GitHub webhook",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -184,7 +208,15 @@ export async function POST(req: NextRequest) {
         accessToken
       );
     } catch (error) {
-      throw new Error(await handleApiError(error));
+       return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create GitHub webhook",
+      },
+      { status: 500 }
+    );
     }
 
     const gitInfo = await fetchGitLatestCommit({
@@ -243,7 +275,15 @@ export async function POST(req: NextRequest) {
       throw new Error(await handleApiError("Failed to start deployment"));
     }
   } catch (error) {
-    throw new Error(await handleApiError(error));
+     return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create GitHub webhook",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -273,6 +313,14 @@ export async function PATCH(req: NextRequest) {
       data: deployment,
     });
   } catch (error: unknown) {
-    throw new Error(await handleApiError(error));
+     return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to create GitHub webhook",
+      },
+      { status: 500 }
+    );
   }
 }

@@ -57,6 +57,8 @@ export const updateProject = createAsyncThunk<
     );
     return response.data.project as Project;
   } catch (error) {
+    console.log(error);
+    
     const errorMessage = await handleApiError(error);
     return rejectWithValue(errorMessage);
   }

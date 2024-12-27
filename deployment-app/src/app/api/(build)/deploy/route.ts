@@ -3,19 +3,27 @@ import { DeploymentModel } from "@/types/schemas/Deployment";
 import { fetchGitLatestCommit } from "@/utils/github";
 import { DeploymentStatus } from "@prisma/client";
 import { NextRequest, NextResponse } from "next/server";
-import { handleApiError } from "@/redux/api/util";
 import { RunTaskCommand } from "@aws-sdk/client-ecs";
 import { createGitHubWebhook } from "./createGithubWebhook";
 import { ecsClient } from "@/lib/aws";
-import { auth } from "@/auth";
 
 export async function GET(req: NextRequest) {
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authorization token missing or invalid" },
+        { status: 401 }
+      );
+    }
     const searchParams = req.nextUrl.searchParams;
     const projectId = searchParams.get("projectId");
 
     if (!projectId) {
-      throw new Error(await handleApiError("projectId is required"));
+      return NextResponse.json(
+        { error: "projectId is required" },
+        { status: 400 }
+      );
     }
 
     const deployments = await prisma.deployment.findMany({
@@ -24,7 +32,15 @@ export async function GET(req: NextRequest) {
 
     return NextResponse.json({ status: 200, data: deployments });
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch deployments",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -35,7 +51,10 @@ export async function POST(req: NextRequest) {
     // Extract the access token from the Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new Error("Authorization token missing or invalid");
+      return NextResponse.json(
+        { error: "Authorization token missing or invalid" },
+        { status: 401 }
+      );
     }
 
     const accessToken = authHeader.split(" ")[1];
@@ -63,7 +82,7 @@ export async function POST(req: NextRequest) {
 
     if (!parsedData.success) {
       console.log("Error ", parsedData.error);
-      throw new Error("Invalid request");
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
     }
 
     const project = await prisma.project.findUnique({
@@ -71,7 +90,7 @@ export async function POST(req: NextRequest) {
     });
 
     if (!project) {
-      throw new Error("Project not found");
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Verify required AWS environment variables
@@ -85,7 +104,10 @@ export async function POST(req: NextRequest) {
 
     for (const envVar of requiredEnvVars) {
       if (!process.env[envVar]) {
-        throw new Error(`Missing required environment variable: ${envVar}`);
+        return NextResponse.json(
+          { error: `Missing required environment variable: ${envVar}` },
+          { status: 400 }
+        );
       }
     }
 
@@ -95,7 +117,10 @@ export async function POST(req: NextRequest) {
       const webhookSecret = process.env.WEBHOOK_SECRET;
 
       if (!webhookSecret) {
-        throw new Error("Webhook secret is not configured");
+        return NextResponse.json(
+          { error: "Webhook secret is not configured" },
+          { status: 400 }
+        );
       }
 
       await createGitHubWebhook(
@@ -107,7 +132,15 @@ export async function POST(req: NextRequest) {
       );
     } catch (error) {
       console.error("Webhook creation failed:", error);
-      throw new Error(await handleApiError(error));
+      return NextResponse.json(
+        {
+          error:
+            error instanceof Error
+              ? error.message
+              : "Failed to create GitHub webhook",
+        },
+        { status: 500 }
+      );
     }
 
     const gitInfo = await fetchGitLatestCommit({
@@ -174,19 +207,21 @@ export async function POST(req: NextRequest) {
 
       // Enhanced validation for ECS task response
       if (!response.tasks || response.tasks.length === 0) {
-        throw new Error(
-          await handleApiError(
-            "Failed to start deployment task: No tasks created"
-          )
+        return NextResponse.json(
+          {
+            error: "Failed to start deployment task: No tasks created",
+          },
+          { status: 500 }
         );
       }
 
       const task = response.tasks[0];
       if (!task.taskArn) {
-        throw new Error(
-          await handleApiError(
-            "Failed to start deployment task: TaskArn is missing"
-          )
+        return NextResponse.json(
+          {
+            error: "Failed to start deployment task: TaskArn is missing",
+          },
+          { status: 500 }
         );
       }
 
@@ -200,7 +235,12 @@ export async function POST(req: NextRequest) {
       });
 
       if (!updatedDeployment.taskArn) {
-        throw new Error(await handleApiError("Failed to update deployment"));
+        return NextResponse.json(
+          {
+            error: "Failed to update deployment",
+          },
+          { status: 500 }
+        );
       }
 
       return NextResponse.json({
@@ -238,22 +278,40 @@ export async function POST(req: NextRequest) {
     }
   } catch (error) {
     console.error("Deployment failed:", error);
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Internal server error",
+      },
+      { status: 500 }
+    );
   }
 }
 
 // Update deployment status when the deployment is complete/failed
 export async function PATCH(req: NextRequest) {
   try {
+    const authHeader = req.headers.get("Authorization");
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
+      return NextResponse.json(
+        { error: "Authorization token missing or invalid" },
+        { status: 401 }
+      );
+    }
     const deploymentId = req.nextUrl.searchParams.get("deploymentId");
     const { deploymentStatus } = await req.json();
 
     if (!deploymentId) {
-      throw new Error(await handleApiError("deploymentId is required"));
+      return NextResponse.json(
+        { error: "deploymentId is required" },
+        { status: 400 }
+      );
     }
 
     if (!deploymentStatus) {
-      throw new Error(await handleApiError("deploymentStatus is required"));
+      return NextResponse.json(
+        { error: "deploymentStatus is required" },
+        { status: 400 }
+      );
     }
 
     const deployment = await prisma.deployment.update({
@@ -268,6 +326,14 @@ export async function PATCH(req: NextRequest) {
       data: deployment,
     });
   } catch (error: unknown) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to update deployment",
+      },
+      { status: 500 }
+    );
   }
 }

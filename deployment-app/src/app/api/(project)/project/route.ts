@@ -4,7 +4,6 @@ import { ProjectModel } from "@/types/schemas/Project";
 import { generateSlug } from "random-word-slugs";
 import { Octokit } from "@octokit/rest";
 import { auth } from "@/auth";
-import { handleApiError } from "@/redux/api/util";
 import { copyFolder, deleteFolder } from "./s3BucketOperations";
 
 // GET route to get all projects — Dashboard
@@ -13,7 +12,10 @@ export async function GET(req: NextRequest) {
     const userId = req.nextUrl.searchParams.get("userId");
 
     if (!userId) {
-      throw new Error(await handleApiError("userId is required"));
+      return NextResponse.json(
+        { error: "userId is required" },
+        { status: 400 }
+      );
     }
 
     const projects = await prisma.project.findMany({
@@ -22,7 +24,13 @@ export async function GET(req: NextRequest) {
     });
     return NextResponse.json({ status: 200, project: projects });
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to fetch projects",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -34,10 +42,13 @@ export async function POST(req: NextRequest) {
     const validatedData = ProjectModel.safeParse({ ...body, subDomain });
 
     if (!validatedData.success) {
-      throw new Error(
-        await handleApiError(
-          `Invalid request data: ${validatedData.error.flatten().fieldErrors}`
-        )
+      return NextResponse.json(
+        {
+          error: `Invalid request data: ${
+            validatedData.error.flatten().fieldErrors
+          }`,
+        },
+        { status: 400 }
       );
     }
 
@@ -65,7 +76,13 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ status: 200, project: project });
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to create project",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -76,14 +93,11 @@ export async function PATCH(req: NextRequest) {
     const deploymentId = req.nextUrl.searchParams.get("deploymentId");
     const { newSubDomain } = await req.json();
 
-    if (!projectId || !deploymentId) {
-      throw new Error(
-        await handleApiError("Project ID and deployment ID are required")
+    if (!projectId || !deploymentId || !newSubDomain) {
+      return NextResponse.json(
+        { error: "Missing required parameters" },
+        { status: 400 }
       );
-    }
-
-    if (!newSubDomain) {
-      throw new Error(await handleApiError("newSubDomain is required"));
     }
 
     // Get the existing project
@@ -92,15 +106,23 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!existingProject) {
-      throw new Error(await handleApiError("Project not found"));
+      return NextResponse.json(
+        {
+          error: "Project not found",
+        },
+        { status: 404 }
+      );
     }
 
     const oldSubDomain = existingProject.subDomain;
 
     // Only proceed if the subdomain is actually different
     if (oldSubDomain === newSubDomain) {
-      throw new Error(
-        await handleApiError("New subdomain is same as current subdomain")
+      return NextResponse.json(
+        {
+          error: "New subdomain is same as current subdomain",
+        },
+        { status: 400 }
       );
     }
 
@@ -122,7 +144,12 @@ export async function PATCH(req: NextRequest) {
     });
 
     if (!existingDeployment) {
-      throw new Error(await handleApiError("Deployment not found"));
+      return NextResponse.json(
+        {
+          error: "Deployment not found",
+        },
+        { status: 404 }
+      );
     }
 
     // Parse existing environment variables
@@ -147,7 +174,13 @@ export async function PATCH(req: NextRequest) {
       project: updatedProject,
     });
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to update project",
+      },
+      { status: 500 }
+    );
   }
 }
 
@@ -161,7 +194,10 @@ export async function DELETE(req: NextRequest) {
     const projectId = req.nextUrl.searchParams.get("projectId");
 
     if (!projectId) {
-      throw new Error(await handleApiError("projectId is required"));
+      return NextResponse.json(
+        { error: "projectId is required" },
+        { status: 400 }
+      );
     }
 
     const project = await prisma.project.findUnique({
@@ -170,7 +206,7 @@ export async function DELETE(req: NextRequest) {
     });
 
     if (!project) {
-      throw new Error(await handleApiError(`Project not found`));
+      return NextResponse.json({ error: "Project not found" }, { status: 404 });
     }
 
     // Delete webhook if it exists
@@ -185,7 +221,15 @@ export async function DELETE(req: NextRequest) {
           hook_id: project.webhookId,
         });
       } catch (error) {
-        throw new Error(await handleApiError(error));
+        return NextResponse.json(
+          {
+            error:
+              error instanceof Error
+                ? error.message
+                : "Failed to delete GitHub webhook",
+          },
+          { status: 500 }
+        );
       }
     }
 
@@ -203,6 +247,12 @@ export async function DELETE(req: NextRequest) {
       message: `Project and S3 folder deleted successfully`,
     });
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error ? error.message : "Failed to delete project",
+      },
+      { status: 500 }
+    );
   }
 }

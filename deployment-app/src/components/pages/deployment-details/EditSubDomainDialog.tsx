@@ -13,7 +13,6 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Pencil, Loader2 } from "lucide-react";
-import { API, handleApiError } from "@/redux/api/util";
 import { toast } from "sonner";
 import { useAppDispatch } from "@/redux/hooks";
 import { updateProject } from "@/redux/api/projectApi";

@@ -7,7 +7,10 @@ export async function GET() {
   try {
     const session = await auth();
     if (!session?.username) {
-      throw new Error(await handleApiError("User not authenticated"));
+      return NextResponse.json(
+        { error: "User not authenticated" },
+        { status: 401 }
+      );
     }
 
     const existingUser = await prisma.user.findUnique({
@@ -20,37 +23,46 @@ export async function GET() {
 
     return await createNewUser(session);
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error: error instanceof Error ? error.message : "Failed to login",
+      },
+      { status: 500 }
+    );
   }
 }
 
 async function updateExistingUser(existingUser: any, session: any) {
-  const updates = {
-    ...(session?.user?.name !== existingUser.name && {
-      name: session.user.name,
-    }),
-    ...(session?.username !== existingUser.username && {
-      username: session.username,
-    }),
-    ...(session?.user?.image !== existingUser.profileImage && {
-      profileImage: session.user.image,
-    }),
-    ...(session?.accessToken !== existingUser.githubAccessToken && {
-      githubAccessToken: session.accessToken,
-    }),
-  };
+  try {
+    const updates = {
+      ...(session?.user?.name !== existingUser.name && {
+        name: session.user.name,
+      }),
+      ...(session?.username !== existingUser.username && {
+        username: session.username,
+      }),
+      ...(session?.user?.image !== existingUser.profileImage && {
+        profileImage: session.user.image,
+      }),
+      ...(session?.accessToken !== existingUser.githubAccessToken && {
+        githubAccessToken: session.accessToken,
+      }),
+    };
 
-  if (Object.keys(updates).length > 0) {
-    await prisma.user.update({
-      where: { id: existingUser.id },
-      data: updates,
-    });
+    if (Object.keys(updates).length > 0) {
+      await prisma.user.update({
+        where: { id: existingUser.id },
+        data: updates,
+      });
+    }
+
+    return NextResponse.json(
+      { message: "User already exists", user: existingUser },
+      { status: 200 }
+    );
+  } catch (error) {
+    throw new Error(await handleApiError(error));
   }
-
-  return NextResponse.json(
-    { message: "User already exists", user: existingUser },
-    { status: 200 }
-  );
 }
 
 async function createNewUser(session: any) {

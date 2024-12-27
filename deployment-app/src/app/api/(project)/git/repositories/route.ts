@@ -1,14 +1,14 @@
 import { NextResponse, NextRequest } from "next/server";
 import { fetchGitUserRepositories } from "@/utils/github";
-import { handleApiError } from "@/redux/api/util";
 
 export async function GET(req: NextRequest) {
   try {
     // Extract the access token from the Authorization header
     const authHeader = req.headers.get("Authorization");
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
-      throw new Error(
-        await handleApiError("Authorization token missing or invalid")
+      return NextResponse.json(
+        { error: "Authorization token missing or invalid" },
+        { status: 401 }
       );
     }
 
@@ -16,8 +16,9 @@ export async function GET(req: NextRequest) {
     const username = req.nextUrl.searchParams.get("username");
 
     if (!username) {
-      throw new Error(
-        await handleApiError("Username query parameter is required")
+      return NextResponse.json(
+        { error: "Username query parameter is required" },
+        { status: 400 }
       );
     }
 
@@ -25,6 +26,14 @@ export async function GET(req: NextRequest) {
     const repositories = await fetchGitUserRepositories(accessToken);
     return NextResponse.json(repositories);
   } catch (error) {
-    throw new Error(await handleApiError(error));
+    return NextResponse.json(
+      {
+        error:
+          error instanceof Error
+            ? error.message
+            : "Failed to fetch repositories",
+      },
+      { status: 500 }
+    );
   }
 }

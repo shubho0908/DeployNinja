@@ -28,12 +28,17 @@ export default function ProjectsPage() {
   const [searchQuery, setSearchQuery] = useState("");
   const [timeFilter, setTimeFilter] = useState("all");
   const [frameworkFilter, setFrameworkFilter] = useState("all");
-  const [isLoading, setIsLoading] = useState(true);
 
   const filteredProjects = useMemo(() => {
     if (!projects) return [];
 
-    return projects.filter((project) => {
+    const sortedProjects = [...projects].sort((a, b) => {
+      const dateA = new Date(a.createdAt!).getTime();
+      const dateB = new Date(b.createdAt!).getTime();
+      return dateB - dateA;
+    });
+
+    return sortedProjects.filter((project) => {
       const matchesSearch =
         !searchQuery ||
         project.name.toLowerCase().includes(searchQuery.toLowerCase());
