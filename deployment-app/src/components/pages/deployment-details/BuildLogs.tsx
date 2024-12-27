@@ -50,7 +50,6 @@ export function BuildLogsSection({
 }: BuildLogsSectionProps) {
   return (
     <AccordionItem
-      disabled={isLoading || buildLogs.length === 0}
       value="build-logs"
       className="border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-900/70 backdrop:blur-lg"
     >
