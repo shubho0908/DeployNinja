@@ -1,6 +1,14 @@
 import { NextResponse, NextRequest } from "next/server";
 import { fetchGitUserRepositories } from "@/utils/github";
 
+/**
+ * Retrieves a list of repositories for a given GitHub username.
+ *
+ * @param {NextRequest} req - The incoming request.
+ * @returns {Promise<NextResponse>} - A promise that resolves to the response.
+ * @throws {Error} - If authentication fails or if there is an error
+ *   fetching the repositories.
+ */
 export async function GET(req: NextRequest) {
   try {
     // Extract the access token from the Authorization header

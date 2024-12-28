@@ -7,7 +7,24 @@ import { Octokit } from "@octokit/rest";
 import { exec } from "child_process";
 import { handleApiError } from "@/redux/api/util";
 
-// Function to create a Github webhook for a given repository
+/**
+ * Creates a GitHub webhook for a specified repository.
+ *
+ * This function checks if a webhook with the given URL already exists
+ * for the specified GitHub repository. If not, it creates a new webhook
+ * with the provided configuration and updates the project in the database
+ * with the webhook ID.
+ *
+ * @param {string} projectId - The ID of the project to update in the database.
+ * @param {string} repoUrl - The URL of the GitHub repository.
+ * @param {string} secret - The secret used for securing the webhook.
+ * @param {string} webhookUrl - The URL where the webhook should send events.
+ * @param {string} accessToken - The GitHub access token for authentication.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ * 
+ * @throws {Error} - Throws an error if the GitHub API request fails.
+ */
+
 async function createGitHubWebhook(
   projectId: string,
   repoUrl: string,
@@ -80,7 +97,16 @@ async function createGitHubWebhook(
   }
 }
 
-// Function to run Docker deployment
+/**
+ * Deploys a Docker container using the Docker CLI, setting environment variables and
+ * the DEPLOYEMENT_ID environment variable to the given deployment ID.
+ *
+ * @param deploymentId The ID of the deployment to deploy.
+ * @param ecrImage The ECR image to deploy.
+ * @param environmentVariables Optional environment variables to set in the container.
+ * @returns A promise that resolves if the container starts successfully, or rejects
+ * if there is an error.
+ */
 async function runDockerDeploymentWithCLI(
   deploymentId: string,
   ecrImage: string,
@@ -120,6 +146,13 @@ async function runDockerDeploymentWithCLI(
   }
 }
 
+/**
+ * GET route to fetch all deployments for a given project ID.
+ *
+ * @param {NextRequest} req - The incoming request.
+ * @returns {Promise<NextResponse>} - A promise that resolves to the response.
+ * @throws {Error} - If projectId is not provided, or if there is an error fetching deployments.
+ */
 export async function GET(req: NextRequest) {
   try {
     const searchParams = req.nextUrl.searchParams;
@@ -147,7 +180,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST route to start a deployment
+/**
+ * POST route to start a deployment.
+ *
+ * @param {NextRequest} req - The incoming request.
+ * @returns {Promise<NextResponse>} - A promise that resolves to the response.
+ * @throws {Error} - If the request is invalid, or if there is an error starting the deployment.
+ */
+
 export async function POST(req: NextRequest) {
   try {
     console.log("⚡️ POST request received ⚡");
@@ -287,7 +327,13 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Update deployment status when the deployment is complete/failed
+    /**
+     * PATCH route to update the deployment status.
+     *
+     * @param {NextRequest} req - The incoming request.
+     * @returns {Promise<NextResponse>} - A promise that resolves to the response.
+     * @throws {Error} - If deploymentId is not provided, or if there is an error updating the deployment status.
+     */
 export async function PATCH(req: NextRequest) {
   try {
     const deploymentId = req.nextUrl.searchParams.get("deploymentId");

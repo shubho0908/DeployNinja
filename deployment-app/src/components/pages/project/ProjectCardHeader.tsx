@@ -42,7 +42,11 @@ export function ProjectHeader({
                     ? `http://${project.subDomain}.localhost:8000`
                     : "#"
                 }
-                target="_blank"
+                target={
+                  latestDeployment?.deploymentStatus === "READY"
+                    ? "_blank"
+                    : "_self"
+                }
                 onClick={(e) => e.stopPropagation()}
                 className="text-muted-foreground hover:text-primary transition-colors cursor-pointer"
               >
@@ -51,7 +55,7 @@ export function ProjectHeader({
                     ? `${project.subDomain.slice(0, 5)}...localhost:8000`
                     : `${project.subDomain}.localhost:8000`
                   : latestDeployment?.deploymentStatus === "IN_PROGRESS"
-                  ? "Deployment in prpogress.."
+                  ? "Deployment in progress.."
                   : "Deployment Failed"}
               </Link>
             )}
