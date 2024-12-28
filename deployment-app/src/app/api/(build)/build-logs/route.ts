@@ -18,6 +18,12 @@ export const BuildLogsSchema = z.object({
 
 type BuildLogs = z.infer<typeof BuildLogsSchema>;
 
+/**
+ * @description Fetches build logs for a given deployment ID.
+ * @param {NextRequest} req
+ * @returns {NextResponse} JSON response containing the build logs and the current deployment status.
+ * @throws {Error} If the deployment ID is not provided, or if there is an error fetching the build logs.
+ */
 export async function GET(req: NextRequest) {
   const deploymentId = req.nextUrl.searchParams.get("deploymentId");
 
@@ -75,6 +81,12 @@ function isDeploymentInFinalState(status: DeploymentStatus): boolean {
   return finalStates.includes(status);
 }
 
+/**
+ * Fetches the build logs for a given deployment ID from ClickHouse.
+ * @param {string} deploymentId The ID of the deployment to fetch logs for.
+ * @returns {Promise<BuildLogs[]>} A promise resolving to an array of build logs.
+ * @throws {Error} If there is an error fetching the logs.
+ */
 async function fetchLogs(deploymentId: string): Promise<BuildLogs[]> {
   try {
     const logs = await client.query({
@@ -90,6 +102,15 @@ async function fetchLogs(deploymentId: string): Promise<BuildLogs[]> {
   }
 }
 
+/**
+ * Checks the status of an ECS task.
+ * @param {string} taskArn The ARN of the task to check.
+ * @returns {Promise<{isActive: boolean, isSuccessful: boolean, error?: string}>} A promise resolving to an object with properties describing the task status.
+ * - isActive: Whether the task is currently running or in a transitional state.
+ * - isSuccessful: Whether the task completed successfully.
+ * - error?: An optional string describing an error that occurred during the check.
+ * @throws {Error} If there is an error checking the task status.
+ */
 async function checkECSTaskStatus(taskArn: string): Promise<{
   isActive: boolean;
   isSuccessful: boolean;
@@ -141,6 +162,16 @@ async function checkECSTaskStatus(taskArn: string): Promise<{
   }
 }
 
+/**
+ * Updates deployment status based on ECS task status and logs.
+ * If task is not found, or ECS task status check fails, deployment status is set to "FAILED".
+ * If ECS task is inactive and logs show completion, deployment status is set to "READY".
+ * If ECS task is active, deployment status is set to "IN_PROGRESS".
+ * If ECS task is successful and logs show completion, deployment status is set to "READY".
+ * @param {string} deploymentId - ID of the deployment to update
+ * @param {string | null} taskArn - ARN of the ECS task to check
+ * @param {BuildLogs[]} logs - Array of build logs
+ */
 async function updateDeploymentStatus(
   deploymentId: string,
   taskArn: string | null,
@@ -175,6 +206,15 @@ async function updateDeploymentStatus(
 
   await updateStatus(deploymentId, newStatus);
 }
+
+/**
+ * Updates the deployment status in the database by sending a PATCH request.
+ * This function requires an authenticated session with a valid access token.
+ * 
+ * @param {string} deploymentId - The ID of the deployment to update.
+ * @param {DeploymentStatus} status - The new status to set for the deployment.
+ * @throws {Error} If authentication fails or if the update request fails.
+ */
 
 async function updateStatus(deploymentId: string, status: DeploymentStatus) {
   try {

@@ -2,6 +2,24 @@ import { prisma } from "@/lib/prisma";
 import { Octokit } from "@octokit/rest";
 import { NextResponse } from "next/server";
 
+/**
+ * Creates a GitHub webhook for a specified repository.
+ *
+ * This function checks if a webhook with the given URL already exists
+ * for the specified GitHub repository. If not, it creates a new webhook
+ * with the provided configuration and updates the project in the database
+ * with the webhook ID.
+ *
+ * @param {string} projectId - The ID of the project to update in the database.
+ * @param {string} repoUrl - The URL of the GitHub repository.
+ * @param {string} secret - The secret used for securing the webhook.
+ * @param {string} webhookUrl - The URL where the webhook should send events.
+ * @param {string} accessToken - The GitHub access token for authentication.
+ * @returns {Promise<void>} - A promise that resolves when the operation is complete.
+ * 
+ * @throws {Error} - Throws an error if the GitHub API request fails.
+ */
+
 export async function createGitHubWebhook(
   projectId: string,
   repoUrl: string,

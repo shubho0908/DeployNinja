@@ -6,7 +6,14 @@ import { Octokit } from "@octokit/rest";
 import { auth } from "@/auth";
 import { copyFolder, deleteFolder } from "./s3BucketOperations";
 
-// GET route to get all projects — Dashboard
+/**
+ * Retrieves all projects for a given user ID.
+ *
+ * @param {NextRequest} req - The incoming request containing the user ID as a query parameter.
+ * @returns {Promise<NextResponse>} - A promise that resolves to a JSON response containing the projects and a HTTP status code.
+ * @throws {Error} - If the userId is not provided, or if there is an error fetching projects from the database.
+ */
+
 export async function GET(req: NextRequest) {
   try {
     const userId = req.nextUrl.searchParams.get("userId");
@@ -34,7 +41,14 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST route to create a new project
+/**
+ * Handles the creation of a new project by processing a POST request.
+ *
+ * @param {NextRequest} req - The incoming request containing project details.
+ * @returns {Promise<NextResponse>} - A promise that resolves to a JSON response with the created project data or an error message.
+ * @throws {Error} - If the request body is invalid or if there is an error creating the project.
+ */
+
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
@@ -86,7 +100,15 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// PATCH route to update sub-domain
+/**
+ * Updates the subdomain of a project and updates the PROJECT_URI environment variable for the
+ * associated deployment.
+ *
+ * @param {NextRequest} req - The incoming request containing the new subdomain to update to.
+ * @returns {NextResponse} JSON response indicating the result of the update operation.
+ * @throws {Error} - If there are issues with authorization, input validation, project retrieval,
+ *                   environment variable configuration, or database operations.
+ */
 export async function PATCH(req: NextRequest) {
   try {
     const projectId = req.nextUrl.searchParams.get("projectId");
@@ -184,7 +206,17 @@ export async function PATCH(req: NextRequest) {
   }
 }
 
-// DELETE route to delete a project
+/**
+ * Deletes a project and its associated resources. This includes:
+ * - Deleting the project record from the database
+ * - Deleting all deployments associated with the project
+ * - Deleting the GitHub webhook
+ * - Deleting the project folder from S3
+ *
+ * @param {NextRequest} req - The incoming request.
+ * @returns {Promise<NextResponse>} - A promise that resolves to the response.
+ * @throws {Error} - Throws an error if authentication fails or if the delete request fails.
+ */
 export async function DELETE(req: NextRequest) {
   try {
     const session = await auth();

@@ -7,6 +7,13 @@ import { RunTaskCommand } from "@aws-sdk/client-ecs";
 import { createGitHubWebhook } from "./createGithubWebhook";
 import { ecsClient } from "@/lib/aws";
 
+/**
+ * @description Fetches all deployments for a given project ID.
+ *
+ * @param {NextRequest} req - The incoming request.
+ * @returns {NextResponse} JSON response containing the deployments and the HTTP status code.
+ * @throws {Error} - If projectId is not provided, or if there is an error fetching deployments.
+ */
 export async function GET(req: NextRequest) {
   try {
     const authHeader = req.headers.get("Authorization");
@@ -44,7 +51,16 @@ export async function GET(req: NextRequest) {
   }
 }
 
-// POST route to start a deployment
+/**
+ * Handles the creation of a new deployment for a given project by processing a POST request.
+ * 
+ * @param {NextRequest} req - The incoming request containing deployment details.
+ * @returns {NextResponse} JSON response indicating the result of the deployment creation process.
+ * @throws {Error} - If there are issues with authorization, input validation, project retrieval,
+ *                   environment variable configuration, GitHub webhook creation, ECS task creation,
+ *                   or deployment record updates.
+ */
+
 export async function POST(req: NextRequest) {
   try {
     console.log("⚡️ POST request received ⚡");
@@ -287,7 +303,14 @@ export async function POST(req: NextRequest) {
   }
 }
 
-// Update deployment status when the deployment is complete/failed
+/**
+ * Updates the deployment status in the database by sending a PATCH request.
+ * This function requires an authenticated session with a valid access token.
+ *
+ * @param {NextRequest} req - The incoming request.
+ * @returns {Promise<NextResponse>} - A promise that resolves to the response.
+ * @throws {Error} If authentication fails or if the update request fails.
+ */
 export async function PATCH(req: NextRequest) {
   try {
     const authHeader = req.headers.get("Authorization");

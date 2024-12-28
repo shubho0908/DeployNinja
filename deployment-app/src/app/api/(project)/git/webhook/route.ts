@@ -5,7 +5,19 @@ import { fetchGitLatestCommit } from "@/utils/github";
 import { DeploymentStatus } from "@/types/enums/deploymentStatus.enum";
 import { API } from "@/redux/api/util";
 
-// Verify GitHub webhook signature
+/**
+ * Verifies the GitHub webhook payload using the HMAC SHA-256 algorithm.
+ * 
+ * This function checks the 'x-hub-signature-256' header from the incoming request
+ * against a computed HMAC digest to ensure the payload's integrity and authenticity.
+ *
+ * @param {NextRequest} req - The incoming HTTP request object containing headers.
+ * @param {string} payload - The raw payload string to verify.
+ * @returns {boolean} - Returns true if the payload is verified successfully, false otherwise.
+ * 
+ * @throws {Error} - Logs an error if the GitHub signature header or webhook secret is missing.
+ */
+
 function verifyGitHubWebhook(req: NextRequest, payload: string): boolean {
   const githubSignatureHeader = req.headers.get("x-hub-signature-256");
 
@@ -28,6 +40,22 @@ function verifyGitHubWebhook(req: NextRequest, payload: string): boolean {
     Buffer.from(githubSignatureHeader)
   );
 }
+
+/**
+ * Handles incoming POST requests for GitHub webhook events.
+ * 
+ * This function processes GitHub webhook payloads, verifies their authenticity,
+ * and triggers deployments for push events. It checks the signature of the payload,
+ * extracts necessary information about the repository and branch, and sends a deployment
+ * request if the event type is a push. The deployment process involves fetching the latest
+ * commit and preparing a payload that includes project and environment details.
+ *
+ * @param {NextRequest} req - The incoming HTTP request object containing the webhook payload.
+ * @returns {Promise<NextResponse>} - A promise resolving to the HTTP response indicating
+ *                                    the result of the webhook processing.
+ * @throws {Error} - If an error occurs during processing, including unauthorized access,
+ *                   missing project data, or failed deployment requests.
+ */
 
 export async function POST(req: NextRequest) {
   try {
