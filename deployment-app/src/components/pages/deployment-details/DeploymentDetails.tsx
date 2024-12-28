@@ -85,14 +85,14 @@ const DomainLink = ({
         target={isReady ? "_blank" : "_self"}
         className="text-blue-600 dark:text-blue-400 hover:underline"
       >
-        {isFailed || isLoading ? "Unavailable" : domain}
+        {isFailed ? "Unavailable" : domain}
       </Link>
-      {isReady && (
+      {!isFailed ? (
         <Copy
           onClick={() => handleCopyUrl(domain)}
           className="h-4 w-4 text-zinc-500 dark:text-zinc-400 ml-1 cursor-pointer"
         />
-      )}
+      ) : null}
     </div>
   );
 };
