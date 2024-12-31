@@ -2,6 +2,13 @@
 
 A robust deployment platform that enables automated deployments directly from GitHub repositories. This platform supports multiple frameworks (React, Vue, Angular) with features like continuous integration, custom subdomains, and comprehensive deployment monitoring.
 
+## Demo
+
+
+https://github.com/user-attachments/assets/f4484fee-af91-48e9-9272-7fa08c0879e6
+
+
+
 ## Features
 
 - GitHub Authentication Integration
