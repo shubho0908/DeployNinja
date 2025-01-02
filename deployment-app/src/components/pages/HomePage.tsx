@@ -64,8 +64,8 @@ export default function Home() {
     },
     {
       icon: <Zap className="h-6 w-6" />,
-      title: "Real-time Analytics",
-      description: "Monitor your application's performance in real-time",
+      title: "Continuous Integration & Deployment",
+      description: "Automate your deployment process with our services",
     },
   ];
 
